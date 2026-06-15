@@ -496,18 +496,22 @@ function getDb() { return window._db; }
 // Save a single note to Firestore: pins/{profile}_{noteId}
 async function saveNoteToCloud(note) {
   if (!activeProfile) return;
-  const db = getDb(); if (!db) return;
-  const docId = activeProfile + '_' + note.id;
-  await window._fsSetDoc(window._fsDoc(db, 'pins', docId), {
-    ...note, profile: activeProfile
-  });
+  const db = getDb();
+  if (!db) return;
+
+  await window._fsSetDoc(
+    window._fsDoc(db, 'pins', String(note.id)),
+    note
+  );
 }
 
 async function deleteNoteFromCloud(noteId) {
-  if (!activeProfile) return;
-  const db = getDb(); if (!db) return;
-  const docId = activeProfile + '_' + noteId;
-  await window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
+  const db = getDb();
+  if (!db) return;
+
+  await window._fsDeleteDoc(
+    window._fsDoc(db, 'pins', String(noteId))
+  );
 }
 
 // Subscribe to ALL pins in real time — everyone sees everyone's pins
@@ -699,26 +703,79 @@ function selectCat(btn) { document.querySelectorAll('.cat-btn').forEach(b => b.c
 function getSelectedCat() { const s = document.querySelector('.cat-btn.selected'); return s ? s.dataset.cat : 'pin'; }
 
 async function saveNote() {
+
   const title = document.getElementById('inp-title').value.trim() || 'Unnamed place';
   const body = document.getElementById('inp-notes').value.trim();
   const cat = getSelectedCat();
+
   if (editingId !== null) {
-    const idx = notes.findIndex(n => n.id === editingId);
-    if (idx > -1) {
-      const updated = Object.assign({}, notes[idx], { title, body, cat });
-      await saveNoteToCloud(updated);
+    const note = notes.find(n => n.id === editingId);
+
+    if (!note) return;
+
+    if (note.owner && note.owner !== activeProfile) {
+      alert('You can only edit your own pins.');
+      return;
     }
+
+    const updated = { ...note, title, body, cat };
+    await saveNoteToCloud(updated);
+
   } else {
+
     if (!currentLat) return;
-    const note = { id: Date.now(), lat: currentLat, lng: currentLng, title, body, cat, profile: activeProfile };
-    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+
+    const note = {
+      id: crypto.randomUUID(),
+      lat: currentLat,
+      lng: currentLng,
+      title,
+      body,
+      cat,
+      owner: activeProfile,
+      profile: activeProfile,
+      parentId: null,
+      createdAt: Date.now()
+    };
+
+    if (tempMarker) {
+      map.removeLayer(tempMarker);
+      tempMarker = null;
+    }
+
     await saveNoteToCloud(note);
   }
+
   closeDrawer();
+}
+
+async function clonePin(id) {
+  const original = notes.find(n => String(n.id) === String(id));
+  if (!original) return;
+
+  const clone = {
+    ...original,
+    id: crypto.randomUUID(),
+    owner: activeProfile,
+    profile: activeProfile,
+    parentId: original.id,
+    savedFrom: original.owner || original.profile,
+    createdAt: Date.now()
+  };
+
+  await saveNoteToCloud(clone);
 }
 
 async function deleteNote() {
   if (editingId === null) return;
+
+  const note = notes.find(n => n.id === editingId);
+
+  if (note && note.owner && note.owner !== activeProfile) {
+    alert('You can only delete your own pins.');
+    return;
+  }
+
   await deleteNoteFromCloud(editingId);
   closeDrawer();
 }
@@ -830,111 +887,3 @@ if (window._firebaseReady) {
 </script>
 </body>
 </html>
-
-
-WANDERPIN PATCH FILE
-
-Replace saveNoteToCloud() with:
-
-async function saveNoteToCloud(note) {
-  if (!activeProfile) return;
-
-  const db = getDb();
-  if (!db) return;
-
-  await window._fsSetDoc(
-    window._fsDoc(db, 'pins', String(note.id)),
-    note
-  );
-}
-
-Replace deleteNoteFromCloud() with:
-
-async function deleteNoteFromCloud(noteId) {
-  const db = getDb();
-  if (!db) return;
-
-  await window._fsDeleteDoc(
-    window._fsDoc(db, 'pins', String(noteId))
-  );
-}
-
-Replace saveNote() with:
-
-async function saveNote() {
-
-  const title = document.getElementById('inp-title').value.trim() || 'Unnamed place';
-  const body = document.getElementById('inp-notes').value.trim();
-  const cat = getSelectedCat();
-
-  if (editingId !== null) {
-
-    const note = notes.find(n => n.id === editingId);
-
-    if (!note) return;
-
-    if (note.owner !== activeProfile) {
-      alert('You can only edit your own pins.');
-      return;
-    }
-
-    const updated = {
-      ...note,
-      title,
-      body,
-      cat
-    };
-
-    await saveNoteToCloud(updated);
-
-  } else {
-
-    if (!currentLat) return;
-
-    const note = {
-      id: crypto.randomUUID(),
-      lat: currentLat,
-      lng: currentLng,
-      title,
-      body,
-      cat,
-      owner: activeProfile,
-      profile: activeProfile,
-      parentId: null,
-      createdAt: Date.now()
-    };
-
-    if (tempMarker) {
-      map.removeLayer(tempMarker);
-      tempMarker = null;
-    }
-
-    await saveNoteToCloud(note);
-  }
-
-  closeDrawer();
-}
-
-Add this function:
-
-async function clonePin(id) {
-
-  const original = notes.find(n => n.id === id);
-
-  if (!original) return;
-
-  const clone = {
-    ...original,
-    id: crypto.randomUUID(),
-    owner: activeProfile,
-    profile: activeProfile,
-    parentId: original.id,
-    savedFrom: original.owner,
-    createdAt: Date.now()
-  };
-
-  await saveNoteToCloud(clone);
-}
-
-Replace placeMarker() with the version from the chat response.
-
