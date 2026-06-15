@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wanderpin</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script type="module">
+// ── Firebase setup (module scope) ──
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC2p5HPV1H2p9FYFy-0LfFf1X84HqeJhtw",
+  authDomain: "wanderpin-c3bd4.firebaseapp.com",
+  projectId: "wanderpin-c3bd4",
+  storageBucket: "wanderpin-c3bd4.firebasestorage.app",
+  messagingSenderId: "594204375579",
+  appId: "1:594204375579:web:705aa33ecd1fcaba7216be"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+// Expose Firestore helpers to global scope so the rest of the app can use them
+window._db = db;
+window._fsCollection = collection;
+window._fsDoc = doc;
+window._fsSetDoc = setDoc;
+window._fsDeleteDoc = deleteDoc;
+window._fsOnSnapshot = onSnapshot;
+window._firebaseReady = true;
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<style>
+:root {
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --surface2: #f0ede6;
+  --border: rgba(0,0,0,0.09);
+  --border2: rgba(0,0,0,0.15);
+  --text: #1a1714;
+  --text2: #6b6560;
+  --text3: #a09a94;
+  --accent: #c8602a;
+  --accent-soft: #fdf0e8;
+  --accent-hover: #b05222;
+  --green: #2d7a4f;
+  --green-soft: #eaf5ee;
+  --shadow: 0 2px 16px rgba(0,0,0,0.10);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
+  --radius: 10px;
+  --radius-lg: 14px;
+  --tile: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+}
+[data-theme="dark"] {
+  --bg: #13110f;
+  --surface: #1e1b17;
+  --surface2: #2a2620;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0ece6;
+  --text2: #9a9188;
+  --text3: #5a5248;
+  --accent: #e07840;
+  --accent-soft: #2e1f12;
+  --accent-hover: #c8602a;
+  --green: #4aad72;
+  --green-soft: #102218;
+  --shadow: 0 2px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.2s, color 0.2s; }
+
+/* Header */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 18px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  z-index: 1000;
+  box-shadow: 0 1px 0 var(--border);
+}
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo-mark { width: 28px; height: 28px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.logo-mark svg { width: 16px; height: 16px; }
+.logo-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.4px; }
+.logo-name span { color: var(--accent); }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.mode-toggle {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.mode-toggle:hover { border-color: var(--border2); color: var(--text); }
+.add-pin-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.add-pin-btn:hover { background: var(--accent-hover); }
+.add-pin-btn.active { background: var(--green); }
+
+/* Map */
+#map { flex: 1; width: 100%; }
+
+/* Places sidebar */
+#sidebar {
+  position: fixed;
+  top: 52px; left: 0;
+  width: 260px;
+  height: calc(100vh - 52px);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  z-index: 900;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+#sidebar.open { transform: translateX(0); }
+.sidebar-toggle {
+  position: fixed;
+  top: 62px; left: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 1100;
+  box-shadow: var(--shadow);
+  transition: all 0.15s;
+  font-size: 15px;
+}
+.sidebar-toggle:hover { background: var(--surface2); }
+.sidebar-toggle.shifted { left: 272px; }
+.sb-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.sb-header h3 { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
+.sb-count { display: inline-block; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; border-radius: 10px; padding: 1px 7px; margin-left: 6px; }
+.sb-scroll { flex: 1; overflow-y: auto; }
+.sb-empty { padding: 32px 16px; font-size: 13px; color: var(--text3); text-align: center; line-height: 1.6; }
+.sb-item {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  display: flex; align-items: flex-start; gap: 10px;
+  transition: background 0.12s;
+}
+.sb-item:hover { background: var(--surface2); }
+.sb-emoji { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.sb-info { flex: 1; min-width: 0; }
+.sb-title { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-sub { font-size: 11px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+/* Drawer */
+#drawer {
+  position: fixed; top: 0; right: 0;
+  width: 400px; height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  z-index: 2000;
+  box-shadow: var(--shadow-lg);
+}
+#drawer.open { transform: translateX(0); }
+.drawer-header {
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.drawer-header h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+.close-btn {
+  background: var(--surface2); border: none; cursor: pointer; color: var(--text2);
+  width: 28px; height: 28px; border-radius: 7px; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.close-btn:hover { background: var(--border2); color: var(--text); }
+.drawer-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.drawer-section { padding: 20px 18px; display: flex; flex-direction: column; gap: 16px; }
+.tips-section { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); }
+.field-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+input[type="text"], textarea {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+input[type="text"]:focus, textarea:focus { border-color: var(--accent); background: var(--surface); }
+textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+.cat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.cat-btn {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer; padding: 9px 4px; text-align: center;
+  transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.cat-btn .em { font-size: 20px; }
+.cat-btn .cl { font-size: 10px; color: var(--text3); font-family: inherit; font-weight: 500; }
+.cat-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+.cat-btn.selected { border-color: var(--accent); background: var(--accent-soft); }
+.cat-btn.selected .cl { color: var(--accent); }
+.coords-pill { font-size: 11px; color: var(--text3); font-family: monospace; background: var(--surface2); border-radius: 6px; padding: 7px 11px; border: 1px solid var(--border); }
+.drawer-footer { padding: 16px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
+.btn-save {
+  flex: 1; background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+  padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s;
+}
+.btn-save:hover { background: var(--accent-hover); }
+.btn-del {
+  background: none; color: #d94040; border: 1.5px solid rgba(210,64,64,0.2); border-radius: var(--radius);
+  padding: 11px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.btn-del:hover { background: rgba(210,64,64,0.07); }
+
+/* AI chat panel inside drawer */
+.ai-divider {
+  display: flex; align-items: center; gap: 10px; margin: 4px 0;
+}
+.ai-divider::before, .ai-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.ai-divider span { font-size: 11px; color: var(--text3); white-space: nowrap; font-weight: 500; }
+.ai-chat-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.ai-messages { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.msg {
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.msg-avatar {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-top: 1px;
+}
+.msg-avatar.ai { background: var(--accent); color: #fff; font-weight: 700; font-size: 11px; }
+.msg-avatar.user { background: var(--surface); border: 1px solid var(--border); }
+.msg-bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px 10px 10px 3px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.55;
+  flex: 1;
+}
+.msg.user .msg-bubble { background: var(--accent-soft); border-color: transparent; border-radius: 10px 10px 3px 10px; color: var(--text); }
+.msg-bubble.loading { color: var(--text3); }
+.dot-anim span { display: inline-block; animation: dotbounce 1.2s infinite; }
+.dot-anim span:nth-child(2) { animation-delay: 0.2s; }
+.dot-anim span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotbounce { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+.ai-input-row {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  display: flex; gap: 8px; align-items: flex-end;
+}
+.ai-input-row input {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit;
+  padding: 8px 11px; outline: none; transition: border-color 0.15s;
+}
+.ai-input-row input:focus { border-color: var(--accent); }
+.ai-send {
+  background: var(--accent); color: #fff; border: none; border-radius: 8px;
+  width: 34px; height: 34px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: background 0.15s;
+}
+.ai-send:hover { background: var(--accent-hover); }
+.ai-send:disabled { background: var(--text3); cursor: not-allowed; }
+.quick-asks { padding: 0 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-btn {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+  padding: 4px 11px; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.15s;
+}
+.quick-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+/* Profile Modal */
+#profile-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(3px);
+}
+#profile-modal.hidden { display: none; }
+.profile-card {
+  background: var(--surface); border-radius: 18px; padding: 32px 28px;
+  width: 340px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 20px;
+}
+.profile-card h2 { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+.profile-card p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-top: -10px; }
+.profile-input-wrap { display: flex; flex-direction: column; gap: 8px; }
+.profile-input-wrap label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+.profile-existing { display: flex; flex-direction: column; gap: 6px; }
+.profile-existing-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+.profile-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
+.profile-list-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid var(--border); background: var(--surface2);
+  transition: all 0.15s; font-size: 13px; font-weight: 500; color: var(--text);
+}
+.profile-list-item:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.profile-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.profile-pin-count { margin-left: auto; font-size: 11px; color: var(--text3); }
+.btn-create-profile {
+  background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+  padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: background 0.15s; width: 100%;
+}
+.btn-create-profile:hover { background: var(--accent-hover); }
+.divider-or { display: flex; align-items: center; gap: 10px; color: var(--text3); font-size: 12px; }
+.divider-or::before, .divider-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.profile-btn {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 5px 11px 5px 7px; font-size: 12px; font-weight: 500; color: var(--text2);
+  cursor: pointer; font-family: inherit; transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.profile-btn:hover { border-color: var(--border2); color: var(--text); }
+.profile-btn .p-avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+/* Popups */
+.leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border2) !important; border-radius: 12px !important; box-shadow: var(--shadow-lg) !important; }
+.leaflet-popup-tip-container { display: none; }
+.leaflet-popup-content { margin: 13px 16px !important; }
+.popup-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; }
+.popup-body { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 10px; }
+.popup-actions { display: flex; gap: 8px; }
+.popup-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; font-size: 11px; font-weight: 500; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.popup-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.popup-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.popup-btn.primary:hover { background: var(--accent-hover); }
+</style>
+</head>
+<body data-theme="light">
+
+<!-- Profile Modal -->
+<div id="profile-modal" class="hidden">
+  <div class="profile-card">
+    <div>
+      <h2>👋 Welcome to Wanderpin</h2>
+      <p>Create a profile to save your pins — or pick an existing one.</p>
+    </div>
+    <div id="existing-profiles-wrap" class="profile-existing" style="display:none">
+      <div class="profile-existing-label">Your profiles</div>
+      <div class="profile-list" id="profile-list"></div>
+      <div class="divider-or">or create new</div>
+    </div>
+    <div class="profile-input-wrap">
+      <label for="profile-name-input">Your name</label>
+      <input type="text" id="profile-name-input" placeholder="e.g. Maya, TravelBuddy42..." maxlength="24" />
+    </div>
+    <button class="btn-create-profile" onclick="createProfile()">Start exploring →</button>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M8 1.5C5.51 1.5 3.5 3.51 3.5 6C3.5 9.5 8 14.5 8 14.5C8 14.5 12.5 9.5 12.5 6C12.5 3.51 10.49 1.5 8 1.5ZM8 7.75C7.03 7.75 6.25 6.97 6.25 6C6.25 5.03 7.03 4.25 8 4.25C8.97 4.25 9.75 5.03 9.75 6C9.75 6.97 8.97 7.75 8 7.75Z" fill="white"/></svg>
+    </div>
+    <span class="logo-name">wander<span>pin</span></span>
+  </div>
+  <div class="header-right">
+    <button class="profile-btn" id="profile-btn" onclick="openProfileModal()">
+      <div class="p-avatar" id="profile-avatar">?</div>
+      <span id="profile-label">Profile</span>
+    </button>
+    <button class="mode-toggle" onclick="toggleTheme()" id="theme-btn">🌙 Dark mode</button>
+    <button class="add-pin-btn" id="pin-mode-btn" onclick="togglePinMode()">+ Add pin</button>
+  </div>
+</header>
+
+<button class="sidebar-toggle" id="sb-toggle" onclick="toggleSidebar()" title="My places">🗺</button>
+
+<div id="sidebar">
+  <div class="sb-header">
+    <h3>My Places <span class="sb-count" id="sb-count">0</span></h3>
+  </div>
+  <div class="sb-scroll">
+    <div class="sb-empty" id="sb-empty">No pins yet.<br>Click "+ Add pin" then tap the map!</div>
+    <div id="sb-items"></div>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<div id="drawer">
+  <div class="drawer-header">
+    <h2 id="drawer-title">New place</h2>
+    <button class="close-btn" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body">
+    <div class="drawer-section">
+      <div>
+        <div class="field-label">Place name</div>
+        <input type="text" id="inp-title" placeholder="e.g. Amazing rooftop bar, Hidden beach..." />
+      </div>
+      <div>
+        <div class="field-label">My notes</div>
+        <textarea id="inp-notes" placeholder="Tips, memories, things to remember..."></textarea>
+      </div>
+      <div>
+        <div class="field-label">Category</div>
+        <div class="cat-grid">
+          <button class="cat-btn selected" data-cat="pin" onclick="selectCat(this)"><span class="em">📍</span><span class="cl">Pin</span></button>
+          <button class="cat-btn" data-cat="food" onclick="selectCat(this)"><span class="em">🍜</span><span class="cl">Food</span></button>
+          <button class="cat-btn" data-cat="hotel" onclick="selectCat(this)"><span class="em">🏨</span><span class="cl">Stay</span></button>
+          <button class="cat-btn" data-cat="sight" onclick="selectCat(this)"><span class="em">🏛️</span><span class="cl">Sight</span></button>
+          <button class="cat-btn" data-cat="nature" onclick="selectCat(this)"><span class="em">🌿</span><span class="cl">Nature</span></button>
+          <button class="cat-btn" data-cat="coffee" onclick="selectCat(this)"><span class="em">☕</span><span class="cl">Café</span></button>
+          <button class="cat-btn" data-cat="budget" onclick="selectCat(this)"><span class="em">💸</span><span class="cl">Budget</span></button>
+          <button class="cat-btn" data-cat="fave" onclick="selectCat(this)"><span class="em">⭐</span><span class="cl">Fave</span></button>
+        </div>
+      </div>
+      <div class="coords-pill" id="coords-pill">No location selected</div>
+    </div>
+
+    <div class="tips-section">
+      <div class="field-label">✦ Wikipedia Travel Guide</div>
+      <div class="quick-asks" id="quick-asks">
+        <button class="quick-btn" onclick="quickAsk('Best budget hostels here?')">🛏 Hostels</button>
+        <button class="quick-btn" onclick="quickAsk('Top local food and restaurants to try?')">🍜 Local food</button>
+        <button class="quick-btn" onclick="quickAsk('Best free things to do and hidden gems?')">🏛 What to see</button>
+        <button class="quick-btn" onclick="quickAsk('Budget travel tips and how to save money here?')">💸 Budget tips</button>
+        <button class="quick-btn" onclick="quickAsk('Is it safe for solo travelers? Any tips?')">🧳 Solo travel</button>
+      </div>
+      <div class="ai-chat-box">
+        <div class="ai-messages" id="ai-messages">
+          <div class="msg">
+            <div class="msg-bubble" style="border:none;background:none;padding:4px 0;color:var(--text3);font-size:13px;">Pick a topic above or ask anything about this destination.</div>
+          </div>
+        </div>
+        <div class="ai-input-row">
+          <input type="text" id="ai-input" placeholder="e.g. What's the weather like in October?" />
+          <button class="ai-send" id="ai-send-btn" onclick="sendAiMessage()">➤</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn-save" onclick="saveNote()">Save place</button>
+    <button class="btn-del" id="delete-btn" style="display:none" onclick="deleteNote()">Delete</button>
+  </div>
+</div>
+
+<script>
+const ACTIVE_KEY = 'wanderpin_active'; // only remember last username locally
+const CAT_EMOJI = { pin:'📍', food:'🍜', hotel:'🏨', sight:'🏛️', nature:'🌿', coffee:'☕', budget:'💸', fave:'⭐' };
+let notes = [], markers = {}, currentLat = null, currentLng = null, editingId = null, tempMarker = null;
+let pinMode = false, sidebarOpen = false;
+let currentLocationName = '';
+let currentTheme = 'light';
+let aiBusy = false;
+let activeProfile = null;
+let unsubscribeSnapshot = null; // live listener cleanup
+
+// ── Firestore helpers (wait for firebase-ready) ──
+function getDb() { return window._db; }
+
+// Save a single note to Firestore: pins/{profile}_{noteId}
+async function saveNoteToCloud(note) {
+  if (!activeProfile) return;
+  const db = getDb(); if (!db) return;
+  const docId = activeProfile + '_' + note.id;
+  await window._fsSetDoc(window._fsDoc(db, 'pins', docId), {
+    ...note, profile: activeProfile
+  });
+}
+
+async function deleteNoteFromCloud(noteId) {
+  if (!activeProfile) return;
+  const db = getDb(); if (!db) return;
+  const docId = activeProfile + '_' + noteId;
+  await window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
+}
+
+// Subscribe to ALL pins in real time — everyone sees everyone's pins
+function subscribeToAllPins() {
+  if (unsubscribeSnapshot) unsubscribeSnapshot();
+  const db = getDb(); if (!db) return;
+  const pinsCol = window._fsCollection(db, 'pins');
+  unsubscribeSnapshot = window._fsOnSnapshot(pinsCol, (snapshot) => {
+    // Clear map markers
+    Object.values(markers).forEach(m => map.removeLayer(m));
+    markers = {};
+    notes = [];
+    snapshot.forEach(docSnap => {
+      const note = docSnap.data();
+      notes.push(note);
+      placeMarker(note);
+    });
+    renderList();
+  });
+}
+
+// Saving notes now just writes to Firestore (snapshot updates the UI)
+function saveNotes() { /* no-op: handled per-note in saveNote() / deleteNote() */ }
+function loadNotes() { /* no-op: handled by subscribeToAllPins() */ }
+
+// ── Profile UI ──
+// Profiles list is fetched from Firestore snapshot (distinct profile names)
+function getProfilesFromNotes() {
+  const seen = {};
+  notes.forEach(n => { if (n.profile) seen[n.profile] = (seen[n.profile] || 0) + 1; });
+  return seen;
+}
+
+function openProfileModal() {
+  const profileCounts = getProfilesFromNotes();
+  const names = Object.keys(profileCounts);
+  const wrap = document.getElementById('existing-profiles-wrap');
+  const list = document.getElementById('profile-list');
+  if (names.length > 0) {
+    wrap.style.display = 'flex';
+    list.innerHTML = names.map(n => {
+      const count = profileCounts[n] || 0;
+      const initial = n[0].toUpperCase();
+      return '<div class="profile-list-item" onclick="switchProfile(\'' + n + '\')">' +
+        '<div class="profile-avatar">' + initial + '</div>' +
+        '<span>' + n + '</span>' +
+        '<span class="profile-pin-count">' + count + ' pin' + (count !== 1 ? 's' : '') + '</span>' +
+        '</div>';
+    }).join('');
+  } else {
+    wrap.style.display = 'none';
+  }
+  document.getElementById('profile-name-input').value = '';
+  document.getElementById('profile-modal').classList.remove('hidden');
+}
+
+function closeProfileModal() {
+  document.getElementById('profile-modal').classList.add('hidden');
+}
+
+function createProfile() {
+  const name = document.getElementById('profile-name-input').value.trim();
+  if (!name) { document.getElementById('profile-name-input').focus(); return; }
+  switchProfile(name);
+}
+
+function switchProfile(name) {
+  activeProfile = name;
+  localStorage.setItem(ACTIVE_KEY, name);
+  document.getElementById('profile-avatar').textContent = name[0].toUpperCase();
+  document.getElementById('profile-label').textContent = name;
+  closeProfileModal();
+}
+
+// Allow pressing Enter in profile name input
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('profile-name-input');
+  if (inp) inp.addEventListener('keydown', function(e){ if(e.key==='Enter') createProfile(); });
+  document.getElementById('profile-modal').addEventListener('click', function(e){
+    if (e.target === this && activeProfile) closeProfileModal();
+  });
+});
+
+const lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const darkTile  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
+let tileLayer = L.tileLayer(lightTile, { attribution: 'OpenStreetMap + CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+
+function toggleTheme() {
+  currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+  document.body.setAttribute('data-theme', currentTheme);
+  document.getElementById('theme-btn').textContent = currentTheme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode';
+  map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(currentTheme === 'dark' ? darkTile : lightTile, { attribution: 'OpenStreetMap + CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
+}
+
+function togglePinMode() {
+  pinMode = !pinMode;
+  const btn = document.getElementById('pin-mode-btn');
+  btn.textContent = pinMode ? '✕ Cancel' : '+ Add pin';
+  btn.classList.toggle('active', pinMode);
+  map.getContainer().style.cursor = pinMode ? 'crosshair' : '';
+}
+
+function toggleSidebar() {
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('open', sidebarOpen);
+  document.getElementById('sb-toggle').classList.toggle('shifted', sidebarOpen);
+  document.getElementById('sb-toggle').textContent = sidebarOpen ? '✕' : '🗺';
+}
+
+function makeIcon(emoji) {
+  return L.divIcon({
+    html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.25))">' + emoji + '</div>',
+    iconSize: [34,34], iconAnchor: [17,30], popupAnchor: [0,-32], className: ''
+  });
+}
+
+map.on('click', async function(e) {
+  if (!pinMode) return;
+  currentLat = e.latlng.lat; currentLng = e.latlng.lng;
+  if (tempMarker) map.removeLayer(tempMarker);
+  tempMarker = L.marker([currentLat, currentLng], { icon: makeIcon('📍') }).addTo(map);
+  currentLocationName = '';
+  try {
+    const r = await fetch('https://nominatim.openstreetmap.org/reverse?lat=' + currentLat + '&lon=' + currentLng + '&format=json');
+    const d = await r.json();
+    const city = d.address.city || d.address.town || d.address.village || d.address.county || '';
+    const country = d.address.country || '';
+    currentLocationName = [city, country].filter(Boolean).join(', ');
+    document.getElementById('inp-title').value = currentLocationName;
+  } catch(err) {}
+  document.getElementById('coords-pill').textContent = 'Lat ' + currentLat.toFixed(4) + '  Lng ' + currentLng.toFixed(4);
+  editingId = null;
+  document.getElementById('drawer-title').textContent = 'New place';
+  document.getElementById('delete-btn').style.display = 'none';
+  document.getElementById('inp-notes').value = '';
+  document.querySelectorAll('.cat-btn').forEach((b,i) => b.classList.toggle('selected', i===0));
+  resetAiChat();
+  openDrawer();
+  togglePinMode();
+});
+
+function openDrawer() { document.getElementById('drawer').classList.add('open'); }
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+  editingId = null;
+}
+
+function selectCat(btn) { document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
+function getSelectedCat() { const s = document.querySelector('.cat-btn.selected'); return s ? s.dataset.cat : 'pin'; }
+
+async function saveNote() {
+  const title = document.getElementById('inp-title').value.trim() || 'Unnamed place';
+  const body = document.getElementById('inp-notes').value.trim();
+  const cat = getSelectedCat();
+  if (editingId !== null) {
+    const idx = notes.findIndex(n => n.id === editingId);
+    if (idx > -1) {
+      const updated = Object.assign({}, notes[idx], { title, body, cat });
+      await saveNoteToCloud(updated);
+    }
+  } else {
+    if (!currentLat) return;
+    const note = { id: Date.now(), lat: currentLat, lng: currentLng, title, body, cat, profile: activeProfile };
+    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+    await saveNoteToCloud(note);
+  }
+  closeDrawer();
+}
+
+async function deleteNote() {
+  if (editingId === null) return;
+  await deleteNoteFromCloud(editingId);
+  closeDrawer();
+}
+
+function placeMarker(note) {
+  const emoji = CAT_EMOJI[note.cat] || '📍';
+  const m = L.marker([note.lat, note.lng], { icon: makeIcon(emoji) }).addTo(map);
+  const popupHtml = '<div class="popup-title">' + emoji + ' ' + note.title + '</div>' +
+    (note.body ? '<div class="popup-body">' + note.body.substring(0,120) + (note.body.length>120?'...':'') + '</div>' : '') +
+    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(' + note.id + ')">Edit</button>' +
+    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(' + note.id + ')">Ask AI</button></div>';
+  m.bindPopup(popupHtml, { maxWidth: 260 });
+  markers[note.id] = m;
+}
+
+function editNote(id) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  editingId = id; currentLat = note.lat; currentLng = note.lng;
+  currentLocationName = note.title;
+  document.getElementById('inp-title').value = note.title;
+  document.getElementById('inp-notes').value = note.body || '';
+  document.getElementById('coords-pill').textContent = 'Lat ' + note.lat.toFixed(4) + '  Lng ' + note.lng.toFixed(4);
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('selected', b.dataset.cat === note.cat));
+  document.getElementById('drawer-title').textContent = 'Edit place';
+  document.getElementById('delete-btn').style.display = 'block';
+  resetAiChat();
+  openDrawer();
+}
+
+function askAboutNote(id) {
+  const note = notes.find(n => n.id === id);
+  if (!note) return;
+  editNote(id);
+  setTimeout(function() { quickAsk('Tell me more about ' + note.title + ' — what should I know?'); }, 300);
+}
+
+function renderList() {
+  const total = notes.length;
+  document.getElementById('sb-count').textContent = total;
+  document.getElementById('sb-empty').style.display = total ? 'none' : 'block';
+  document.getElementById('sb-items').innerHTML = notes.map(function(n) {
+    const em = CAT_EMOJI[n.cat] || '📍';
+    const profileTag = n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '';
+    return '<div class="sb-item" onclick="flyTo(' + n.id + ')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
+  }).join('');
+}
+
+function flyTo(id) {
+  const note = notes.find(n => n.id === id);
+  if (note) { map.flyTo([note.lat, note.lng], 13, { duration: 1 }); setTimeout(function(){ if(markers[id]) markers[id].openPopup(); }, 1100); }
+}
+
+// ── Wikipedia Travel Guide ──
+let wikiCache = {};
+
+function resetAiChat() {
+  const loc = currentLocationName || 'this location';
+  document.getElementById('ai-messages').innerHTML =
+    '<div class="msg"><div class="msg-avatar ai">W</div><div class="msg-bubble">Explore <strong>' + loc + '</strong> using Wikipedia! Pick a topic above or type a question below.</div></div>';
+  // Auto-load Wikipedia summary when a location is opened
+  if (currentLocationName) fetchWikiSummary(currentLocationName);
+}
+
+function quickAsk(q) {
+  document.getElementById('ai-input').value = q;
+  sendAiMessage();
+}
+
+function addMessage(role, html, isLoading) {
+  const messagesEl = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = 'msg' + (role === 'user' ? ' user' : '');
+  div.innerHTML = role === 'user'
+    ? '<div class="msg-avatar user">👤</div><div class="msg-bubble">' + html + '</div>'
+    : '<div class="msg-avatar ai">W</div><div class="msg-bubble' + (isLoading ? ' loading' : '') + '">' + html + '</div>';
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+// Extract best search term from user question + location
+function buildWikiQuery(userQ, loc) {
+  const q = userQ.toLowerCase();
+  // Map quick-ask topics to better Wikipedia search terms
+  if (q.includes('hostel') || q.includes('budget') || q.includes('cheap')) return loc + ' travel budget backpacking';
+  if (q.includes('food') || q.includes('restaurant') || q.includes('eat')) return loc + ' cuisine food';
+  if (q.includes('see') || q.includes('attract') || q.includes('gem') || q.includes('free')) return loc + ' tourism attractions';
+  if (q.includes('safe') || q.includes('solo')) return loc + ' travel';
+  if (q.includes('weather') || q.includes('climate')) return loc + ' climate';
+  if (q.includes('transport') || q.includes('getting around') || q.includes('bus') || q.includes('train')) return loc + ' transport';
+  // Generic: combine location + keywords from question
+  const words = userQ.replace(/[^a-zA-Z ]/g, '').split(' ').filter(w => w.length > 3).slice(0, 3).join(' ');
+  return loc + (words ? ' ' + words : '');
+}
+
+async function fetchWikiSummary(searchTerm) {
+  if (wikiCache[searchTerm]) return wikiCache[searchTerm];
+  // Search for best matching article
+  const searchUrl = 'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' +
+    encodeURIComponent(searchTerm) + '&format=json&origin=*&srlimit=1';
+  const searchResp = await fetch(searchUrl);
+  const searchData = await searchResp.json();
+  const results = searchData.query && searchData.query.search;
+  if (!results || results.length === 0) return null;
+
+  const title = results[0].title;
+  // Fetch extract (intro paragraphs) for that article
+  const extractUrl = 'https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=' +
+    encodeURIComponent(title) + '&format=json&origin=*';
+  const extractResp = await fetch(extractUrl);
+  const extractData = await extractResp.json();
+  const pages = extractData.query && extractData.query.pages;
+  const page = pages && Object.values(pages)[0];
+  if (!page || !page.extract) return null;
+
+  const result = { title: page.title, extract: page.extract, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(page.title) };
+  wikiCache[searchTerm] = result;
+  return result;
+}
+
+function formatWikiExtract(extract, maxChars) {
+  // Take first few sentences up to maxChars
+  let text = extract.replace(/\n+/g, ' ').trim();
+  if (text.length > maxChars) {
+    text = text.substring(0, maxChars);
+    const lastDot = text.lastIndexOf('.');
+    if (lastDot > maxChars * 0.6) text = text.substring(0, lastDot + 1);
+    else text += '…';
+  }
+  return text;
+}
+
+async function sendAiMessage() {
+  if (aiBusy) return;
+  const input = document.getElementById('ai-input');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  aiBusy = true;
+  document.getElementById('ai-send-btn').disabled = true;
+
+  const loc = currentLocationName || (currentLat ? currentLat.toFixed(3) + ', ' + currentLng.toFixed(3) : '');
+  addMessage('user', q);
+  const loadingDiv = addMessage('ai', '<span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>', true);
+
+  try {
+    const searchTerm = loc ? buildWikiQuery(q, loc) : q;
+    const wiki = await fetchWikiSummary(searchTerm);
+
+    let html;
+    if (wiki) {
+      const snippet = formatWikiExtract(wiki.extract, 600);
+      html = '<p>' + snippet + '</p>' +
+        '<p style="margin-top:8px"><a href="' + wiki.url + '" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none;">📖 Read more on Wikipedia: ' + wiki.title + ' →</a></p>';
+    } else {
+      const fallbackUrl = 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(loc ? loc + ' ' + q : q);
+      html = '<p>Couldn\'t find a Wikipedia article for that. Try a broader question, or <a href="' + fallbackUrl + '" target="_blank" style="color:var(--accent)">search Wikipedia directly →</a></p>';
+    }
+
+    loadingDiv.querySelector('.msg-bubble').innerHTML = html;
+    loadingDiv.querySelector('.msg-bubble').classList.remove('loading');
+  } catch(err) {
+    loadingDiv.querySelector('.msg-bubble').innerHTML = 'Couldn\'t reach Wikipedia. Check your connection and try again.';
+    loadingDiv.querySelector('.msg-bubble').classList.remove('loading');
+  }
+
+  aiBusy = false;
+  document.getElementById('ai-send-btn').disabled = false;
+  document.getElementById('ai-messages').scrollTop = 999999;
+}
+
+async function fetchWikiSummaryAndShow(loc) {
+  const loadingDiv = addMessage('ai', '<span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>', true);
+  try {
+    const wiki = await fetchWikiSummary(loc);
+    if (wiki) {
+      const snippet = formatWikiExtract(wiki.extract, 500);
+      loadingDiv.querySelector('.msg-bubble').innerHTML =
+        '<p>' + snippet + '</p><p style="margin-top:8px"><a href="' + wiki.url + '" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none;">📖 ' + wiki.title + ' on Wikipedia →</a></p>';
+    } else {
+      loadingDiv.querySelector('.msg-bubble').innerHTML = 'No Wikipedia article found for this location. Try asking a specific question below!';
+    }
+  } catch(e) {
+    loadingDiv.querySelector('.msg-bubble').innerHTML = 'Could not load travel info. Check your connection.';
+  }
+  loadingDiv.querySelector('.msg-bubble').classList.remove('loading');
+  document.getElementById('ai-messages').scrollTop = 999999;
+}
+
+document.getElementById('ai-input').addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey) sendAiMessage(); });
+
+// ── Init: wait for Firebase, then start live listener and show profile modal ──
+function startApp() {
+  subscribeToAllPins(); // live listener for all pins
+  const saved = localStorage.getItem(ACTIVE_KEY);
+  if (saved) {
+    switchProfile(saved);
+  } else {
+    openProfileModal();
+  }
+}
+
+if (window._firebaseReady) {
+  startApp();
+} else {
+  window.addEventListener('firebase-ready', startApp);
+}
+</script>
+</body>
+</html>
