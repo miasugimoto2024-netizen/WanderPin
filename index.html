@@ -716,16 +716,11 @@ async function saveNote() {
   const cat = getSelectedCat();
 
   if (editingId !== null) {
-    const note = notes.find(n => n.id === editingId);
+    const note = notes.find(n => String(n.id) === String(editingId));
 
     if (!note) return;
 
-    if (note.owner && note.owner !== activeProfile) {
-      alert('You can only edit your own pins.');
-      return;
-    }
-
-    const updated = { ...note, title, body, cat };
+    const updated = { ...note, title, body, cat, lastEditedBy: activeProfile, lastEditedAt: Date.now() };
     await saveNoteToCloud(updated);
 
   } else {
@@ -776,13 +771,6 @@ async function clonePin(id) {
 async function deleteNote() {
   if (editingId === null) return;
 
-  const note = notes.find(n => n.id === editingId);
-
-  if (note && note.owner && note.owner !== activeProfile) {
-    alert('You can only delete your own pins.');
-    return;
-  }
-
   await deleteNoteFromCloud(editingId);
   closeDrawer();
 }
@@ -790,7 +778,11 @@ async function deleteNote() {
 function placeMarker(note) {
   const emoji = CAT_EMOJI[note.cat] || '📍';
   const m = L.marker([note.lat, note.lng], { icon: makeIcon(emoji) }).addTo(map);
+  const ownerTag = note.lastEditedBy
+    ? '<div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;">Last edited by ' + note.lastEditedBy + '</div>'
+    : (note.profile ? '<div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;">Added by ' + note.profile + '</div>' : '');
   const popupHtml = '<div class="popup-title">' + emoji + ' ' + note.title + '</div>' +
+    ownerTag +
     (note.body ? '<div class="popup-body">' + note.body.substring(0,120) + (note.body.length>120?'...':'') + '</div>' : '') +
     '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(\'' + note.id + '\')">Edit</button>' +
     '<button class="popup-btn" onclick="map.closePopup();askAboutNote(\'' + note.id + '\')">Ask AI</button></div>';
@@ -799,7 +791,7 @@ function placeMarker(note) {
 }
 
 function editNote(id) {
-  const note = notes.find(n => n.id === id);
+  const note = notes.find(n => String(n.id) === String(id));
   if (!note) return;
   editingId = id; currentLat = note.lat; currentLng = note.lng;
   currentLocationName = note.title;
@@ -814,7 +806,7 @@ function editNote(id) {
 }
 
 function askAboutNote(id) {
-  const note = notes.find(n => n.id === id);
+  const note = notes.find(n => String(n.id) === String(id));
   if (!note) return;
   editNote(id);
   setTimeout(function() { quickAsk('Tell me more about ' + note.title + ' — what should I know?'); }, 300);
@@ -826,13 +818,15 @@ function renderList() {
   document.getElementById('sb-empty').style.display = total ? 'none' : 'block';
   document.getElementById('sb-items').innerHTML = notes.map(function(n) {
     const em = CAT_EMOJI[n.cat] || '📍';
-    const profileTag = n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '';
+    const profileTag = n.lastEditedBy
+      ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">Edited by ' + n.lastEditedBy + '</span> · '
+      : (n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '');
     return '<div class="sb-item" onclick="flyTo(\'' + n.id + '\')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
   }).join('');
 }
 
 function flyTo(id) {
-  const note = notes.find(n => n.id === id);
+  const note = notes.find(n => String(n.id) === String(id));
   if (note) { map.flyTo([note.lat, note.lng], 13, { duration: 1 }); setTimeout(function(){ if(markers[id]) markers[id].openPopup(); }, 1100); }
 }
 
