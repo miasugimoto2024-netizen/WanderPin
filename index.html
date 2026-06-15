@@ -768,6 +768,12 @@ async function clonePin(id) {
   await saveNoteToCloud(clone);
 }
 
+async function deletePinDirect(id) {
+  if (!confirm('Delete this pin?')) return;
+  map.closePopup();
+  await deleteNoteFromCloud(id);
+}
+
 async function deleteNote() {
   if (editingId === null) return;
 
@@ -785,7 +791,8 @@ function placeMarker(note) {
     ownerTag +
     (note.body ? '<div class="popup-body">' + note.body.substring(0,120) + (note.body.length>120?'...':'') + '</div>' : '') +
     '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(\'' + note.id + '\')">Edit</button>' +
-    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(\'' + note.id + '\')">Ask AI</button></div>';
+    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(\'' + note.id + '\')">Ask AI</button>' +
+    '<button class="popup-btn" onclick="deletePinDirect(\'' + note.id + '\')" style="color:#d94040;">Delete</button></div>';
   m.bindPopup(popupHtml, { maxWidth: 260 });
   markers[note.id] = m;
 }
