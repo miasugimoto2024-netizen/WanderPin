@@ -490,10 +490,18 @@ let aiBusy = false;
 let activeProfile = null;
 let unsubscribeSnapshot = null;
 
+// ── Unique ID generator (fallback for non-secure contexts where crypto.randomUUID is unavailable) ──
+function generateId() {
+  if (window.crypto && typeof crypto.randomUUID === 'function') {
+    try { return crypto.randomUUID(); } catch (e) {}
+  }
+  return 'id-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
+}
+
 // ── Firestore helpers (wait for firebase-ready) ──
 function getDb() { return window._db; }
 
-// Save a single note to Firestore: pins/{profile}_{noteId}
+// Save a single note to Firestore: pins/{noteId}
 async function saveNoteToCloud(note) {
   if (!activeProfile) return;
   const db = getDb();
@@ -579,12 +587,11 @@ function saveProfileNames(names) {
 
 function deleteProfile(name) {
   if (!confirm('Delete profile "' + name + '"? Their pins will also be removed from the shared map.')) return;
-  // Remove all pins for this profile from Firestore
+  // Remove all pins for this profile from Firestore (fixed: use the pin's own id as the doc id)
   const db = getDb();
   if (db) {
     notes.filter(n => n.profile === name).forEach(n => {
-      const docId = name + '_' + n.id;
-      window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
+      window._fsDeleteDoc(window._fsDoc(db, 'pins', String(n.id)));
     });
   }
   // Remove from local profile names list
@@ -726,7 +733,7 @@ async function saveNote() {
     if (!currentLat) return;
 
     const note = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       lat: currentLat,
       lng: currentLng,
       title,
@@ -755,7 +762,7 @@ async function clonePin(id) {
 
   const clone = {
     ...original,
-    id: crypto.randomUUID(),
+    id: generateId(),
     owner: activeProfile,
     profile: activeProfile,
     parentId: original.id,
@@ -785,8 +792,8 @@ function placeMarker(note) {
   const m = L.marker([note.lat, note.lng], { icon: makeIcon(emoji) }).addTo(map);
   const popupHtml = '<div class="popup-title">' + emoji + ' ' + note.title + '</div>' +
     (note.body ? '<div class="popup-body">' + note.body.substring(0,120) + (note.body.length>120?'...':'') + '</div>' : '') +
-    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(' + note.id + ')">Edit</button>' +
-    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(' + note.id + ')">Ask AI</button></div>';
+    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(\'' + note.id + '\')">Edit</button>' +
+    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(\'' + note.id + '\')">Ask AI</button></div>';
   m.bindPopup(popupHtml, { maxWidth: 260 });
   markers[note.id] = m;
 }
@@ -820,7 +827,7 @@ function renderList() {
   document.getElementById('sb-items').innerHTML = notes.map(function(n) {
     const em = CAT_EMOJI[n.cat] || '📍';
     const profileTag = n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '';
-    return '<div class="sb-item" onclick="flyTo(' + n.id + ')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
+    return '<div class="sb-item" onclick="flyTo(\'' + n.id + '\')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
   }).join('');
 }
 
