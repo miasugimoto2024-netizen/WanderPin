@@ -332,6 +332,12 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 .profile-list-item:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .profile-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .profile-pin-count { margin-left: auto; font-size: 11px; color: var(--text3); }
+.profile-delete-btn {
+  background: none; border: none; cursor: pointer; color: var(--text3);
+  font-size: 15px; padding: 2px 4px; border-radius: 4px; line-height: 1;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.profile-delete-btn:hover { color: #d94040; background: rgba(210,64,64,0.08); }
 .btn-create-profile {
   background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
   padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
@@ -381,19 +387,19 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 <div id="profile-modal" class="hidden">
   <div class="profile-card">
     <div>
-      <h2>👋 Welcome to Wanderpin</h2>
-      <p>Create a profile to save your pins — or pick an existing one.</p>
+      <h2>👋 Wanderpin</h2>
+      <p>Pick your profile or create a new one.</p>
     </div>
     <div id="existing-profiles-wrap" class="profile-existing" style="display:none">
-      <div class="profile-existing-label">Your profiles</div>
+      <div class="profile-existing-label">Profiles</div>
       <div class="profile-list" id="profile-list"></div>
-      <div class="divider-or">or create new</div>
     </div>
+    <div class="divider-or"><span>create new</span></div>
     <div class="profile-input-wrap">
       <label for="profile-name-input">Your name</label>
       <input type="text" id="profile-name-input" placeholder="e.g. Maya, TravelBuddy42..." maxlength="24" />
     </div>
-    <button class="btn-create-profile" onclick="createProfile()">Start exploring →</button>
+    <button class="btn-create-profile" onclick="createProfile()">Create & start exploring →</button>
   </div>
 </div>
 
@@ -537,18 +543,23 @@ function getProfilesFromNotes() {
 
 function openProfileModal() {
   const profileCounts = getProfilesFromNotes();
-  const names = Object.keys(profileCounts);
+  // Also include profiles stored locally that may have 0 pins
+  const localProfiles = JSON.parse(localStorage.getItem('wanderpin_profile_names') || '[]');
+  const allNames = Array.from(new Set([...localProfiles, ...Object.keys(profileCounts)]));
+
   const wrap = document.getElementById('existing-profiles-wrap');
   const list = document.getElementById('profile-list');
-  if (names.length > 0) {
+
+  if (allNames.length > 0) {
     wrap.style.display = 'flex';
-    list.innerHTML = names.map(n => {
+    list.innerHTML = allNames.map(n => {
       const count = profileCounts[n] || 0;
       const initial = n[0].toUpperCase();
-      return '<div class="profile-list-item" onclick="switchProfile(\'' + n + '\')">' +
-        '<div class="profile-avatar">' + initial + '</div>' +
-        '<span>' + n + '</span>' +
+      return '<div class="profile-list-item">' +
+        '<div class="profile-avatar" style="cursor:pointer" onclick="switchProfile(\'' + n + '\')">' + initial + '</div>' +
+        '<span style="flex:1;cursor:pointer" onclick="switchProfile(\'' + n + '\')">' + n + '</span>' +
         '<span class="profile-pin-count">' + count + ' pin' + (count !== 1 ? 's' : '') + '</span>' +
+        '<button class="profile-delete-btn" onclick="deleteProfile(\'' + n + '\')" title="Delete profile">✕</button>' +
         '</div>';
     }).join('');
   } else {
@@ -558,6 +569,31 @@ function openProfileModal() {
   document.getElementById('profile-modal').classList.remove('hidden');
 }
 
+function saveProfileNames(names) {
+  localStorage.setItem('wanderpin_profile_names', JSON.stringify(names));
+}
+
+function deleteProfile(name) {
+  if (!confirm('Delete profile "' + name + '"? Their pins will also be removed from the shared map.')) return;
+  // Remove all pins for this profile from Firestore
+  const db = getDb();
+  if (db) {
+    notes.filter(n => n.profile === name).forEach(n => {
+      const docId = name + '_' + n.id;
+      window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
+    });
+  }
+  // Remove from local profile names list
+  const localProfiles = JSON.parse(localStorage.getItem('wanderpin_profile_names') || '[]');
+  saveProfileNames(localProfiles.filter(p => p !== name));
+  // If this was the active profile, clear it
+  if (activeProfile === name) {
+    activeProfile = null;
+    localStorage.removeItem(ACTIVE_KEY);
+  }
+  openProfileModal(); // refresh modal
+}
+
 function closeProfileModal() {
   document.getElementById('profile-modal').classList.add('hidden');
 }
@@ -565,6 +601,12 @@ function closeProfileModal() {
 function createProfile() {
   const name = document.getElementById('profile-name-input').value.trim();
   if (!name) { document.getElementById('profile-name-input').focus(); return; }
+  // Save name to local list so it shows up even with 0 pins
+  const localProfiles = JSON.parse(localStorage.getItem('wanderpin_profile_names') || '[]');
+  if (!localProfiles.includes(name)) {
+    localProfiles.push(name);
+    saveProfileNames(localProfiles);
+  }
   switchProfile(name);
 }
 
