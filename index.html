@@ -490,36 +490,24 @@ let aiBusy = false;
 let activeProfile = null;
 let unsubscribeSnapshot = null;
 
-// ── Unique ID generator (fallback for non-secure contexts where crypto.randomUUID is unavailable) ──
-function generateId() {
-  if (window.crypto && typeof crypto.randomUUID === 'function') {
-    try { return crypto.randomUUID(); } catch (e) {}
-  }
-  return 'id-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
-}
-
 // ── Firestore helpers (wait for firebase-ready) ──
 function getDb() { return window._db; }
 
-// Save a single note to Firestore: pins/{noteId}
+// Save a single note to Firestore: pins/{profile}_{noteId}
 async function saveNoteToCloud(note) {
   if (!activeProfile) return;
-  const db = getDb();
-  if (!db) return;
-
-  await window._fsSetDoc(
-    window._fsDoc(db, 'pins', String(note.id)),
-    note
-  );
+  const db = getDb(); if (!db) return;
+  const docId = activeProfile + '_' + note.id;
+  await window._fsSetDoc(window._fsDoc(db, 'pins', docId), {
+    ...note, profile: activeProfile
+  });
 }
 
 async function deleteNoteFromCloud(noteId) {
-  const db = getDb();
-  if (!db) return;
-
-  await window._fsDeleteDoc(
-    window._fsDoc(db, 'pins', String(noteId))
-  );
+  if (!activeProfile) return;
+  const db = getDb(); if (!db) return;
+  const docId = activeProfile + '_' + noteId;
+  await window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
 }
 
 // Subscribe to ALL pins in real time — everyone sees everyone's pins
@@ -587,11 +575,12 @@ function saveProfileNames(names) {
 
 function deleteProfile(name) {
   if (!confirm('Delete profile "' + name + '"? Their pins will also be removed from the shared map.')) return;
-  // Remove all pins for this profile from Firestore (fixed: use the pin's own id as the doc id)
+  // Remove all pins for this profile from Firestore
   const db = getDb();
   if (db) {
     notes.filter(n => n.profile === name).forEach(n => {
-      window._fsDeleteDoc(window._fsDoc(db, 'pins', String(n.id)));
+      const docId = name + '_' + n.id;
+      window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
     });
   }
   // Remove from local profile names list
@@ -710,73 +699,26 @@ function selectCat(btn) { document.querySelectorAll('.cat-btn').forEach(b => b.c
 function getSelectedCat() { const s = document.querySelector('.cat-btn.selected'); return s ? s.dataset.cat : 'pin'; }
 
 async function saveNote() {
-
   const title = document.getElementById('inp-title').value.trim() || 'Unnamed place';
   const body = document.getElementById('inp-notes').value.trim();
   const cat = getSelectedCat();
-
   if (editingId !== null) {
-    const note = notes.find(n => String(n.id) === String(editingId));
-
-    if (!note) return;
-
-    const updated = { ...note, title, body, cat, lastEditedBy: activeProfile, lastEditedAt: Date.now() };
-    await saveNoteToCloud(updated);
-
-  } else {
-
-    if (!currentLat) return;
-
-    const note = {
-      id: generateId(),
-      lat: currentLat,
-      lng: currentLng,
-      title,
-      body,
-      cat,
-      owner: activeProfile,
-      profile: activeProfile,
-      parentId: null,
-      createdAt: Date.now()
-    };
-
-    if (tempMarker) {
-      map.removeLayer(tempMarker);
-      tempMarker = null;
+    const idx = notes.findIndex(n => n.id === editingId);
+    if (idx > -1) {
+      const updated = Object.assign({}, notes[idx], { title, body, cat });
+      await saveNoteToCloud(updated);
     }
-
+  } else {
+    if (!currentLat) return;
+    const note = { id: Date.now(), lat: currentLat, lng: currentLng, title, body, cat, profile: activeProfile };
+    if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
     await saveNoteToCloud(note);
   }
-
   closeDrawer();
-}
-
-async function clonePin(id) {
-  const original = notes.find(n => String(n.id) === String(id));
-  if (!original) return;
-
-  const clone = {
-    ...original,
-    id: generateId(),
-    owner: activeProfile,
-    profile: activeProfile,
-    parentId: original.id,
-    savedFrom: original.owner || original.profile,
-    createdAt: Date.now()
-  };
-
-  await saveNoteToCloud(clone);
-}
-
-async function deletePinDirect(id) {
-  if (!confirm('Delete this pin?')) return;
-  map.closePopup();
-  await deleteNoteFromCloud(id);
 }
 
 async function deleteNote() {
   if (editingId === null) return;
-
   await deleteNoteFromCloud(editingId);
   closeDrawer();
 }
@@ -784,21 +726,16 @@ async function deleteNote() {
 function placeMarker(note) {
   const emoji = CAT_EMOJI[note.cat] || '📍';
   const m = L.marker([note.lat, note.lng], { icon: makeIcon(emoji) }).addTo(map);
-  const ownerTag = note.lastEditedBy
-    ? '<div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;">Last edited by ' + note.lastEditedBy + '</div>'
-    : (note.profile ? '<div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:4px;">Added by ' + note.profile + '</div>' : '');
   const popupHtml = '<div class="popup-title">' + emoji + ' ' + note.title + '</div>' +
-    ownerTag +
     (note.body ? '<div class="popup-body">' + note.body.substring(0,120) + (note.body.length>120?'...':'') + '</div>' : '') +
-    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(\'' + note.id + '\')">Edit</button>' +
-    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(\'' + note.id + '\')">Ask AI</button>' +
-    '<button class="popup-btn" onclick="deletePinDirect(\'' + note.id + '\')" style="color:#d94040;">Delete</button></div>';
+    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(' + note.id + ')">Edit</button>' +
+    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(' + note.id + ')">Ask AI</button></div>';
   m.bindPopup(popupHtml, { maxWidth: 260 });
   markers[note.id] = m;
 }
 
 function editNote(id) {
-  const note = notes.find(n => String(n.id) === String(id));
+  const note = notes.find(n => n.id === id);
   if (!note) return;
   editingId = id; currentLat = note.lat; currentLng = note.lng;
   currentLocationName = note.title;
@@ -813,7 +750,7 @@ function editNote(id) {
 }
 
 function askAboutNote(id) {
-  const note = notes.find(n => String(n.id) === String(id));
+  const note = notes.find(n => n.id === id);
   if (!note) return;
   editNote(id);
   setTimeout(function() { quickAsk('Tell me more about ' + note.title + ' — what should I know?'); }, 300);
@@ -825,15 +762,13 @@ function renderList() {
   document.getElementById('sb-empty').style.display = total ? 'none' : 'block';
   document.getElementById('sb-items').innerHTML = notes.map(function(n) {
     const em = CAT_EMOJI[n.cat] || '📍';
-    const profileTag = n.lastEditedBy
-      ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">Edited by ' + n.lastEditedBy + '</span> · '
-      : (n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '');
-    return '<div class="sb-item" onclick="flyTo(\'' + n.id + '\')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
+    const profileTag = n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '';
+    return '<div class="sb-item" onclick="flyTo(' + n.id + ')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
   }).join('');
 }
 
 function flyTo(id) {
-  const note = notes.find(n => String(n.id) === String(id));
+  const note = notes.find(n => n.id === id);
   if (note) { map.flyTo([note.lat, note.lng], 13, { duration: 1 }); setTimeout(function(){ if(markers[id]) markers[id].openPopup(); }, 1100); }
 }
 
