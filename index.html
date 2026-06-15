@@ -830,3 +830,111 @@ if (window._firebaseReady) {
 </script>
 </body>
 </html>
+
+
+WANDERPIN PATCH FILE
+
+Replace saveNoteToCloud() with:
+
+async function saveNoteToCloud(note) {
+  if (!activeProfile) return;
+
+  const db = getDb();
+  if (!db) return;
+
+  await window._fsSetDoc(
+    window._fsDoc(db, 'pins', String(note.id)),
+    note
+  );
+}
+
+Replace deleteNoteFromCloud() with:
+
+async function deleteNoteFromCloud(noteId) {
+  const db = getDb();
+  if (!db) return;
+
+  await window._fsDeleteDoc(
+    window._fsDoc(db, 'pins', String(noteId))
+  );
+}
+
+Replace saveNote() with:
+
+async function saveNote() {
+
+  const title = document.getElementById('inp-title').value.trim() || 'Unnamed place';
+  const body = document.getElementById('inp-notes').value.trim();
+  const cat = getSelectedCat();
+
+  if (editingId !== null) {
+
+    const note = notes.find(n => n.id === editingId);
+
+    if (!note) return;
+
+    if (note.owner !== activeProfile) {
+      alert('You can only edit your own pins.');
+      return;
+    }
+
+    const updated = {
+      ...note,
+      title,
+      body,
+      cat
+    };
+
+    await saveNoteToCloud(updated);
+
+  } else {
+
+    if (!currentLat) return;
+
+    const note = {
+      id: crypto.randomUUID(),
+      lat: currentLat,
+      lng: currentLng,
+      title,
+      body,
+      cat,
+      owner: activeProfile,
+      profile: activeProfile,
+      parentId: null,
+      createdAt: Date.now()
+    };
+
+    if (tempMarker) {
+      map.removeLayer(tempMarker);
+      tempMarker = null;
+    }
+
+    await saveNoteToCloud(note);
+  }
+
+  closeDrawer();
+}
+
+Add this function:
+
+async function clonePin(id) {
+
+  const original = notes.find(n => n.id === id);
+
+  if (!original) return;
+
+  const clone = {
+    ...original,
+    id: crypto.randomUUID(),
+    owner: activeProfile,
+    profile: activeProfile,
+    parentId: original.id,
+    savedFrom: original.owner,
+    createdAt: Date.now()
+  };
+
+  await saveNoteToCloud(clone);
+}
+
+Replace placeMarker() with the version from the chat response.
+
