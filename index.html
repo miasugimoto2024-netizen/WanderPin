@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script type="module">
-// ── Firebase setup (module scope) ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -22,8 +21,6 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-
-// Expose Firestore helpers to global scope so the rest of the app can use them
 window._db = db;
 window._fsCollection = collection;
 window._fsDoc = doc;
@@ -35,125 +32,43 @@ window.dispatchEvent(new Event('firebase-ready'));
 </script>
 <style>
 :root {
-  --bg: #f7f5f0;
-  --surface: #ffffff;
-  --surface2: #f0ede6;
-  --border: rgba(0,0,0,0.09);
-  --border2: rgba(0,0,0,0.15);
-  --text: #1a1714;
-  --text2: #6b6560;
-  --text3: #a09a94;
-  --accent: #c8602a;
-  --accent-soft: #fdf0e8;
-  --accent-hover: #b05222;
-  --green: #2d7a4f;
-  --green-soft: #eaf5ee;
-  --shadow: 0 2px 16px rgba(0,0,0,0.10);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
-  --radius: 10px;
-  --radius-lg: 14px;
-  --tile: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  --bg: #f7f5f0; --surface: #ffffff; --surface2: #f0ede6;
+  --border: rgba(0,0,0,0.09); --border2: rgba(0,0,0,0.15);
+  --text: #1a1714; --text2: #6b6560; --text3: #a09a94;
+  --accent: #c8602a; --accent-soft: #fdf0e8; --accent-hover: #b05222;
+  --green: #2d7a4f; --green-soft: #eaf5ee;
+  --shadow: 0 2px 16px rgba(0,0,0,0.10); --shadow-lg: 0 8px 40px rgba(0,0,0,0.14);
+  --radius: 10px; --radius-lg: 14px;
 }
 [data-theme="dark"] {
-  --bg: #13110f;
-  --surface: #1e1b17;
-  --surface2: #2a2620;
-  --border: rgba(255,255,255,0.08);
-  --border2: rgba(255,255,255,0.14);
-  --text: #f0ece6;
-  --text2: #9a9188;
-  --text3: #5a5248;
-  --accent: #e07840;
-  --accent-soft: #2e1f12;
-  --accent-hover: #c8602a;
-  --green: #4aad72;
-  --green-soft: #102218;
-  --shadow: 0 2px 16px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
+  --bg: #13110f; --surface: #1e1b17; --surface2: #2a2620;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+  --text: #f0ece6; --text2: #9a9188; --text3: #5a5248;
+  --accent: #e07840; --accent-soft: #2e1f12; --accent-hover: #c8602a;
+  --green: #4aad72; --green-soft: #102218;
+  --shadow: 0 2px 16px rgba(0,0,0,0.4); --shadow-lg: 0 8px 40px rgba(0,0,0,0.5);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.2s, color 0.2s; }
 
-/* Header */
-header {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 0 18px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-  z-index: 1000;
-  box-shadow: 0 1px 0 var(--border);
-}
+header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 18px; height: 52px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; z-index: 1000; box-shadow: 0 1px 0 var(--border); }
 .logo { display: flex; align-items: center; gap: 8px; }
 .logo-mark { width: 28px; height: 28px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .logo-mark svg { width: 16px; height: 16px; }
 .logo-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.4px; }
 .logo-name span { color: var(--accent); }
 .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.mode-toggle {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-  display: flex; align-items: center; gap: 5px;
-}
+.mode-toggle { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 5px 12px; font-size: 12px; font-weight: 500; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.15s; display: flex; align-items: center; gap: 5px; }
 .mode-toggle:hover { border-color: var(--border2); color: var(--text); }
-.add-pin-btn {
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 0.15s;
-  display: flex; align-items: center; gap: 5px;
-}
+.add-pin-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s; display: flex; align-items: center; gap: 5px; }
 .add-pin-btn:hover { background: var(--accent-hover); }
 .add-pin-btn.active { background: var(--green); }
 
-/* Map */
 #map { flex: 1; width: 100%; }
 
-/* Places sidebar */
-#sidebar {
-  position: fixed;
-  top: 52px; left: 0;
-  width: 260px;
-  height: calc(100vh - 52px);
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  z-index: 900;
-  transform: translateX(-100%);
-  transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
-}
+#sidebar { position: fixed; top: 52px; left: 0; width: 260px; height: calc(100vh - 52px); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 900; transform: translateX(-100%); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); }
 #sidebar.open { transform: translateX(0); }
-.sidebar-toggle {
-  position: fixed;
-  top: 62px; left: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  z-index: 1100;
-  box-shadow: var(--shadow);
-  transition: all 0.15s;
-  font-size: 15px;
-}
+.sidebar-toggle { position: fixed; top: 62px; left: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 1100; box-shadow: var(--shadow); transition: all 0.15s; font-size: 15px; }
 .sidebar-toggle:hover { background: var(--surface2); }
 .sidebar-toggle.shifted { left: 272px; }
 .sb-header { padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
@@ -161,161 +76,63 @@ header {
 .sb-count { display: inline-block; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 600; border-radius: 10px; padding: 1px 7px; margin-left: 6px; }
 .sb-scroll { flex: 1; overflow-y: auto; }
 .sb-empty { padding: 32px 16px; font-size: 13px; color: var(--text3); text-align: center; line-height: 1.6; }
-.sb-item {
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  display: flex; align-items: flex-start; gap: 10px;
-  transition: background 0.12s;
-}
+.sb-item { padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: flex-start; gap: 10px; transition: background 0.12s; }
 .sb-item:hover { background: var(--surface2); }
 .sb-emoji { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 .sb-info { flex: 1; min-width: 0; }
 .sb-title { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-sub { font-size: 11px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
 
-/* Drawer */
-#drawer {
-  position: fixed; top: 0; right: 0;
-  width: 400px; height: 100vh;
-  background: var(--surface);
-  border-left: 1px solid var(--border);
-  display: flex; flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-  z-index: 2000;
-  box-shadow: var(--shadow-lg);
-}
+#drawer { position: fixed; top: 0; right: 0; width: 400px; height: 100vh; background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); z-index: 2000; box-shadow: var(--shadow-lg); }
 #drawer.open { transform: translateX(0); }
-.drawer-header {
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-}
+.drawer-header { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
 .drawer-header h2 { font-size: 16px; font-weight: 700; color: var(--text); }
-.close-btn {
-  background: var(--surface2); border: none; cursor: pointer; color: var(--text2);
-  width: 28px; height: 28px; border-radius: 7px; font-size: 16px; display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s;
-}
+.close-btn { background: var(--surface2); border: none; cursor: pointer; color: var(--text2); width: 28px; height: 28px; border-radius: 7px; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
 .close-btn:hover { background: var(--border2); color: var(--text); }
 .drawer-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .drawer-section { padding: 20px 18px; display: flex; flex-direction: column; gap: 16px; }
 .tips-section { padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border); }
 .field-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
-input[type="text"], textarea {
-  width: 100%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  font-size: 14px;
-  font-family: inherit;
-  padding: 10px 12px;
-  outline: none;
-  transition: border-color 0.15s, background 0.15s;
-}
+input[type="text"], textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; font-family: inherit; padding: 10px 12px; outline: none; transition: border-color 0.15s, background 0.15s; }
 input[type="text"]:focus, textarea:focus { border-color: var(--accent); background: var(--surface); }
 textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 .cat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
-.cat-btn {
-  background: var(--surface2);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer; padding: 9px 4px; text-align: center;
-  transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 4px;
-}
+.cat-btn { background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 9px 4px; text-align: center; transition: all 0.15s; display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .cat-btn .em { font-size: 20px; }
 .cat-btn .cl { font-size: 10px; color: var(--text3); font-family: inherit; font-weight: 500; }
 .cat-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
 .cat-btn.selected { border-color: var(--accent); background: var(--accent-soft); }
 .cat-btn.selected .cl { color: var(--accent); }
 .coords-pill { font-size: 11px; color: var(--text3); font-family: monospace; background: var(--surface2); border-radius: 6px; padding: 7px 11px; border: 1px solid var(--border); }
-.drawer-footer { padding: 16px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; }
-.btn-save {
-  flex: 1; background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
-  padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s;
-}
+.drawer-footer { padding: 16px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-shrink: 0; flex-direction: column; }
+.btn-save { flex: 1; background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s; }
 .btn-save:hover { background: var(--accent-hover); }
-.btn-del {
-  background: none; color: #d94040; border: 1.5px solid rgba(210,64,64,0.2); border-radius: var(--radius);
-  padding: 11px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s;
-}
+.btn-del { background: none; color: #d94040; border: 1.5px solid rgba(210,64,64,0.2); border-radius: var(--radius); padding: 11px 14px; font-size: 13px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
 .btn-del:hover { background: rgba(210,64,64,0.07); }
 
-/* AI chat panel inside drawer */
-.ai-divider {
-  display: flex; align-items: center; gap: 10px; margin: 4px 0;
-}
-.ai-divider::before, .ai-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.ai-divider span { font-size: 11px; color: var(--text3); white-space: nowrap; font-weight: 500; }
-.ai-chat-box {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-.ai-messages { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
-.msg {
-  display: flex; gap: 8px; align-items: flex-start;
-}
-.msg-avatar {
-  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; margin-top: 1px;
-}
-.msg-avatar.ai { background: var(--accent); color: #fff; font-weight: 700; font-size: 11px; }
-.msg-avatar.user { background: var(--surface); border: 1px solid var(--border); }
-.msg-bubble {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px 10px 10px 3px;
-  padding: 9px 12px;
-  font-size: 13px;
-  color: var(--text);
-  line-height: 1.55;
-  flex: 1;
-}
-.msg.user .msg-bubble { background: var(--accent-soft); border-color: transparent; border-radius: 10px 10px 3px 10px; color: var(--text); }
-.msg-bubble.loading { color: var(--text3); }
-.dot-anim span { display: inline-block; animation: dotbounce 1.2s infinite; }
-.dot-anim span:nth-child(2) { animation-delay: 0.2s; }
-.dot-anim span:nth-child(3) { animation-delay: 0.4s; }
-@keyframes dotbounce { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
-.ai-input-row {
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-  display: flex; gap: 8px; align-items: flex-end;
-}
-.ai-input-row input {
-  flex: 1; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text); font-size: 13px; font-family: inherit;
-  padding: 8px 11px; outline: none; transition: border-color 0.15s;
-}
-.ai-input-row input:focus { border-color: var(--accent); }
-.ai-send {
-  background: var(--accent); color: #fff; border: none; border-radius: 8px;
-  width: 34px; height: 34px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: background 0.15s;
-}
-.ai-send:hover { background: var(--accent-hover); }
-.ai-send:disabled { background: var(--text3); cursor: not-allowed; }
-.quick-asks { padding: 0 12px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-.quick-btn {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
-  padding: 4px 11px; font-size: 11px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.15s;
-}
-.quick-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+/* Edit history log */
+.edit-history { display: flex; flex-direction: column; gap: 5px; }
+.edit-entry { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text3); padding: 5px 0; border-bottom: 1px solid var(--border); }
+.edit-entry:last-child { border-bottom: none; }
+.edit-avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.edit-avatar.create { background: var(--green); }
+.edit-meta { flex: 1; }
+.edit-who { font-weight: 600; color: var(--text2); }
+.edit-time { color: var(--text3); margin-left: 4px; }
+.edit-action { color: var(--text3); font-style: italic; }
+.footer-row { display: flex; gap: 8px; }
 
-/* Profile Modal */
-#profile-modal {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999;
-  display: flex; align-items: center; justify-content: center;
-  backdrop-filter: blur(3px);
-}
+/* Wiki buttons */
+.wiki-btn { display: flex; align-items: center; gap: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; font-weight: 500; color: var(--text); cursor: pointer; font-family: inherit; text-decoration: none; transition: all 0.15s; }
+.wiki-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.wiki-btn .wiki-icon { font-size: 18px; flex-shrink: 0; }
+.wiki-btn .wiki-label { flex: 1; }
+.wiki-btn .wiki-arrow { color: var(--text3); font-size: 12px; }
+
+/* Profile modal */
+#profile-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9999; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(3px); }
 #profile-modal.hidden { display: none; }
-.profile-card {
-  background: var(--surface); border-radius: 18px; padding: 32px 28px;
-  width: 340px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 20px;
-}
+.profile-card { background: var(--surface); border-radius: 18px; padding: 32px 28px; width: 340px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; gap: 20px; }
 .profile-card h2 { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
 .profile-card p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-top: -10px; }
 .profile-input-wrap { display: flex; flex-direction: column; gap: 8px; }
@@ -323,57 +140,28 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 .profile-existing { display: flex; flex-direction: column; gap: 6px; }
 .profile-existing-label { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
 .profile-list { display: flex; flex-direction: column; gap: 4px; max-height: 160px; overflow-y: auto; }
-.profile-list-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 12px; border-radius: 8px; cursor: pointer;
-  border: 1.5px solid var(--border); background: var(--surface2);
-  transition: all 0.15s; font-size: 13px; font-weight: 500; color: var(--text);
-}
+.profile-list-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; cursor: pointer; border: 1.5px solid var(--border); background: var(--surface2); transition: all 0.15s; font-size: 13px; font-weight: 500; color: var(--text); }
 .profile-list-item:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .profile-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
 .profile-pin-count { margin-left: auto; font-size: 11px; color: var(--text3); }
-.profile-delete-btn {
-  background: none; border: none; cursor: pointer; color: var(--text3);
-  font-size: 15px; padding: 2px 4px; border-radius: 4px; line-height: 1;
-  transition: all 0.15s; flex-shrink: 0;
-}
+.profile-delete-btn { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 15px; padding: 2px 4px; border-radius: 4px; line-height: 1; transition: all 0.15s; flex-shrink: 0; }
 .profile-delete-btn:hover { color: #d94040; background: rgba(210,64,64,0.08); }
-.btn-create-profile {
-  background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
-  padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit;
-  transition: background 0.15s; width: 100%;
-}
+.btn-create-profile { background: var(--accent); color: #fff; border: none; border-radius: var(--radius); padding: 11px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.15s; width: 100%; }
 .btn-create-profile:hover { background: var(--accent-hover); }
 .divider-or { display: flex; align-items: center; gap: 10px; color: var(--text3); font-size: 12px; }
 .divider-or::before, .divider-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.profile-btn {
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 20px;
-  padding: 5px 11px 5px 7px; font-size: 12px; font-weight: 500; color: var(--text2);
-  cursor: pointer; font-family: inherit; transition: all 0.15s;
-  display: flex; align-items: center; gap: 6px;
-}
+.profile-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 5px 11px 5px 7px; font-size: 12px; font-weight: 500; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
 .profile-btn:hover { border-color: var(--border2); color: var(--text); }
 .profile-btn .p-avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-
-.wiki-btn {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 10px 14px;
-  font-size: 13px; font-weight: 500; color: var(--text);
-  cursor: pointer; font-family: inherit; text-decoration: none;
-  transition: all 0.15s;
-}
-.wiki-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.wiki-btn .wiki-icon { font-size: 18px; flex-shrink: 0; }
-.wiki-btn .wiki-label { flex: 1; }
-.wiki-btn .wiki-arrow { color: var(--text3); font-size: 12px; }
 
 /* Popups */
 .leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border2) !important; border-radius: 12px !important; box-shadow: var(--shadow-lg) !important; }
 .leaflet-popup-tip-container { display: none; }
 .leaflet-popup-content { margin: 13px 16px !important; }
-.popup-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 4px; }
+.popup-title { font-weight: 700; font-size: 14px; color: var(--text); margin-bottom: 2px; }
+.popup-creator { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
 .popup-body { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 10px; }
+.popup-edited { font-size: 10px; color: var(--text3); margin-bottom: 8px; font-style: italic; }
 .popup-actions { display: flex; gap: 8px; }
 .popup-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 5px 11px; font-size: 11px; font-weight: 500; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.15s; }
 .popup-btn:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
@@ -383,12 +171,11 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 </head>
 <body data-theme="light">
 
-<!-- Profile Modal -->
 <div id="profile-modal" class="hidden">
   <div class="profile-card">
     <div>
       <h2>👋 Wanderpin</h2>
-      <p>Pick your profile or create a new one.</p>
+      <p>Pick your profile or create a new one to start pinning.</p>
     </div>
     <div id="existing-profiles-wrap" class="profile-existing" style="display:none">
       <div class="profile-existing-label">Profiles</div>
@@ -424,7 +211,7 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 
 <div id="sidebar">
   <div class="sb-header">
-    <h3>My Places <span class="sb-count" id="sb-count">0</span></h3>
+    <h3>All Places <span class="sb-count" id="sb-count">0</span></h3>
   </div>
   <div class="sb-scroll">
     <div class="sb-empty" id="sb-empty">No pins yet.<br>Click "+ Add pin" then tap the map!</div>
@@ -439,14 +226,14 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
     <h2 id="drawer-title">New place</h2>
     <button class="close-btn" onclick="closeDrawer()">✕</button>
   </div>
-  <div class="drawer-body" id="drawer-body">
+  <div class="drawer-body">
     <div class="drawer-section">
       <div>
         <div class="field-label">Place name</div>
         <input type="text" id="inp-title" placeholder="e.g. Amazing rooftop bar, Hidden beach..." />
       </div>
       <div>
-        <div class="field-label">My notes</div>
+        <div class="field-label">Notes <span id="notes-collab-hint" style="font-weight:400;text-transform:none;font-size:11px;color:var(--accent);display:none;">— editable by everyone</span></div>
         <textarea id="inp-notes" placeholder="Tips, memories, things to remember..."></textarea>
       </div>
       <div>
@@ -463,78 +250,90 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
         </div>
       </div>
       <div class="coords-pill" id="coords-pill">No location selected</div>
+
+      <!-- Edit history — shown when editing an existing pin -->
+      <div id="edit-history-wrap" style="display:none">
+        <div class="field-label">Edit history</div>
+        <div class="edit-history" id="edit-history"></div>
+      </div>
     </div>
 
     <div class="tips-section">
-      <div class="field-label">✦ Wikipedia Travel Guide</div>
+      <div class="field-label">✦ Travel guide</div>
       <div id="wiki-links-box">
-        <p id="wiki-no-location" style="font-size:13px;color:var(--text3);">Save a place to see Wikipedia links for it.</p>
-        <div id="wiki-buttons" style="display:none; display:flex; flex-direction:column; gap:8px;"></div>
+        <p id="wiki-no-location" style="font-size:13px;color:var(--text3);">Save a place to see travel guide links.</p>
+        <div id="wiki-buttons" style="display:none;flex-direction:column;gap:8px;"></div>
       </div>
     </div>
   </div>
   <div class="drawer-footer">
-    <button class="btn-save" onclick="saveNote()">Save place</button>
-    <button class="btn-del" id="delete-btn" style="display:none" onclick="deleteNote()">Delete</button>
+    <div class="footer-row">
+      <button class="btn-save" onclick="saveNote()">Save place</button>
+      <button class="btn-del" id="delete-btn" style="display:none" onclick="deleteNote()">Delete</button>
+    </div>
+    <div id="footer-owner-note" style="font-size:11px;color:var(--text3);display:none;padding-top:2px;">
+      Only the pin creator can delete this pin.
+    </div>
   </div>
 </div>
 
 <script>
-const ACTIVE_KEY = 'wanderpin_active'; // only remember last username locally
+const ACTIVE_KEY = 'wanderpin_active';
 const CAT_EMOJI = { pin:'📍', food:'🍜', hotel:'🏨', sight:'🏛️', nature:'🌿', coffee:'☕', budget:'💸', fave:'⭐' };
 let notes = [], markers = {}, currentLat = null, currentLng = null, editingId = null, tempMarker = null;
 let pinMode = false, sidebarOpen = false;
 let currentLocationName = '';
 let currentTheme = 'light';
-let aiBusy = false;
 let activeProfile = null;
 let unsubscribeSnapshot = null;
 
-// ── Firestore helpers (wait for firebase-ready) ──
 function getDb() { return window._db; }
 
-// Save a single note to Firestore: pins/{profile}_{noteId}
+// ── Firestore helpers ──
+// Each note stores: id, lat, lng, title, body, cat, profile (creator), editHistory[]
+// editHistory = [{ who, action, ts }]  where action = 'created' | 'edited'
+
 async function saveNoteToCloud(note) {
-  if (!activeProfile) return;
+  if (!activeProfile) { alert('Please select a profile first.'); openProfileModal(); return; }
   const db = getDb(); if (!db) return;
-  const docId = activeProfile + '_' + note.id;
-  await window._fsSetDoc(window._fsDoc(db, 'pins', docId), {
-    ...note, profile: activeProfile
-  });
+  const docId = note.profile + '_' + note.id;
+  await window._fsSetDoc(window._fsDoc(db, 'pins', docId), note);
 }
 
 async function deleteNoteFromCloud(noteId) {
-  if (!activeProfile) return;
   const db = getDb(); if (!db) return;
-  const docId = activeProfile + '_' + noteId;
+  const note = notes.find(n => n.id === noteId);
+  if (!note) return;
+  const docId = note.profile + '_' + noteId;
   await window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
 }
 
-// Subscribe to ALL pins in real time — everyone sees everyone's pins
 function subscribeToAllPins() {
   if (unsubscribeSnapshot) unsubscribeSnapshot();
   const db = getDb(); if (!db) return;
   const pinsCol = window._fsCollection(db, 'pins');
   unsubscribeSnapshot = window._fsOnSnapshot(pinsCol, (snapshot) => {
-    // Clear map markers
     Object.values(markers).forEach(m => map.removeLayer(m));
-    markers = {};
-    notes = [];
+    markers = {}; notes = [];
     snapshot.forEach(docSnap => {
       const note = docSnap.data();
+      if (!note.editHistory) note.editHistory = [];
       notes.push(note);
       placeMarker(note);
     });
     renderList();
+    // Refresh drawer if open on an edited note
+    if (editingId !== null) {
+      const refreshed = notes.find(n => n.id === editingId);
+      if (refreshed) renderEditHistory(refreshed);
+    }
   });
 }
 
-// Saving notes now just writes to Firestore (snapshot updates the UI)
-function saveNotes() { /* no-op: handled per-note in saveNote() / deleteNote() */ }
-function loadNotes() { /* no-op: handled by subscribeToAllPins() */ }
+function saveNotes() {}
+function loadNotes() {}
 
-// ── Profile UI ──
-// Profiles list is fetched from Firestore snapshot (distinct profile names)
+// ── Profile helpers ──
 function getProfilesFromNotes() {
   const seen = {};
   notes.forEach(n => { if (n.profile) seen[n.profile] = (seen[n.profile] || 0) + 1; });
@@ -543,20 +342,17 @@ function getProfilesFromNotes() {
 
 function openProfileModal() {
   const profileCounts = getProfilesFromNotes();
-  // Also include profiles stored locally that may have 0 pins
   const localProfiles = JSON.parse(localStorage.getItem('wanderpin_profile_names') || '[]');
   const allNames = Array.from(new Set([...localProfiles, ...Object.keys(profileCounts)]));
-
   const wrap = document.getElementById('existing-profiles-wrap');
   const list = document.getElementById('profile-list');
-
   if (allNames.length > 0) {
     wrap.style.display = 'flex';
     list.innerHTML = allNames.map(n => {
       const count = profileCounts[n] || 0;
       const initial = n[0].toUpperCase();
       return '<div class="profile-list-item">' +
-        '<div class="profile-avatar" style="cursor:pointer" onclick="switchProfile(\'' + n + '\')">' + initial + '</div>' +
+        '<div class="profile-avatar" onclick="switchProfile(\'' + n + '\')">' + initial + '</div>' +
         '<span style="flex:1;cursor:pointer" onclick="switchProfile(\'' + n + '\')">' + n + '</span>' +
         '<span class="profile-pin-count">' + count + ' pin' + (count !== 1 ? 's' : '') + '</span>' +
         '<button class="profile-delete-btn" onclick="deleteProfile(\'' + n + '\')" title="Delete profile">✕</button>' +
@@ -569,44 +365,29 @@ function openProfileModal() {
   document.getElementById('profile-modal').classList.remove('hidden');
 }
 
-function saveProfileNames(names) {
-  localStorage.setItem('wanderpin_profile_names', JSON.stringify(names));
-}
+function saveProfileNames(names) { localStorage.setItem('wanderpin_profile_names', JSON.stringify(names)); }
 
 function deleteProfile(name) {
-  if (!confirm('Delete profile "' + name + '"? Their pins will also be removed from the shared map.')) return;
-  // Remove all pins for this profile from Firestore
+  if (!confirm('Delete profile "' + name + '"? Their pins will also be removed.')) return;
   const db = getDb();
   if (db) {
     notes.filter(n => n.profile === name).forEach(n => {
-      const docId = name + '_' + n.id;
-      window._fsDeleteDoc(window._fsDoc(db, 'pins', docId));
+      window._fsDeleteDoc(window._fsDoc(db, 'pins', name + '_' + n.id));
     });
   }
-  // Remove from local profile names list
   const localProfiles = JSON.parse(localStorage.getItem('wanderpin_profile_names') || '[]');
   saveProfileNames(localProfiles.filter(p => p !== name));
-  // If this was the active profile, clear it
-  if (activeProfile === name) {
-    activeProfile = null;
-    localStorage.removeItem(ACTIVE_KEY);
-  }
-  openProfileModal(); // refresh modal
+  if (activeProfile === name) { activeProfile = null; localStorage.removeItem(ACTIVE_KEY); }
+  openProfileModal();
 }
 
-function closeProfileModal() {
-  document.getElementById('profile-modal').classList.add('hidden');
-}
+function closeProfileModal() { document.getElementById('profile-modal').classList.add('hidden'); }
 
 function createProfile() {
   const name = document.getElementById('profile-name-input').value.trim();
   if (!name) { document.getElementById('profile-name-input').focus(); return; }
-  // Save name to local list so it shows up even with 0 pins
   const localProfiles = JSON.parse(localStorage.getItem('wanderpin_profile_names') || '[]');
-  if (!localProfiles.includes(name)) {
-    localProfiles.push(name);
-    saveProfileNames(localProfiles);
-  }
+  if (!localProfiles.includes(name)) { localProfiles.push(name); saveProfileNames(localProfiles); }
   switchProfile(name);
 }
 
@@ -618,7 +399,6 @@ function switchProfile(name) {
   closeProfileModal();
 }
 
-// Allow pressing Enter in profile name input
 document.addEventListener('DOMContentLoaded', function() {
   const inp = document.getElementById('profile-name-input');
   if (inp) inp.addEventListener('keydown', function(e){ if(e.key==='Enter') createProfile(); });
@@ -627,9 +407,9 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// ── Map setup ──
 const lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
 const darkTile  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-
 const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
 let tileLayer = L.tileLayer(lightTile, { attribution: 'OpenStreetMap + CARTO', maxZoom: 19, subdomains: 'abcd' }).addTo(map);
 
@@ -642,6 +422,7 @@ function toggleTheme() {
 }
 
 function togglePinMode() {
+  if (!activeProfile) { alert('Pick a profile first!'); openProfileModal(); return; }
   pinMode = !pinMode;
   const btn = document.getElementById('pin-mode-btn');
   btn.textContent = pinMode ? '✕ Cancel' : '+ Add pin';
@@ -681,9 +462,12 @@ map.on('click', async function(e) {
   editingId = null;
   document.getElementById('drawer-title').textContent = 'New place';
   document.getElementById('delete-btn').style.display = 'none';
+  document.getElementById('footer-owner-note').style.display = 'none';
+  document.getElementById('notes-collab-hint').style.display = 'none';
+  document.getElementById('edit-history-wrap').style.display = 'none';
   document.getElementById('inp-notes').value = '';
   document.querySelectorAll('.cat-btn').forEach((b,i) => b.classList.toggle('selected', i===0));
-  resetAiChat();
+  buildWikiLinks('');
   openDrawer();
   togglePinMode();
 });
@@ -698,19 +482,33 @@ function closeDrawer() {
 function selectCat(btn) { document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
 function getSelectedCat() { const s = document.querySelector('.cat-btn.selected'); return s ? s.dataset.cat : 'pin'; }
 
+// ── Save / Delete ──
 async function saveNote() {
+  if (!activeProfile) { alert('Pick a profile first!'); openProfileModal(); return; }
   const title = document.getElementById('inp-title').value.trim() || 'Unnamed place';
   const body = document.getElementById('inp-notes').value.trim();
   const cat = getSelectedCat();
+  const now = Date.now();
+
   if (editingId !== null) {
-    const idx = notes.findIndex(n => n.id === editingId);
-    if (idx > -1) {
-      const updated = Object.assign({}, notes[idx], { title, body, cat });
-      await saveNoteToCloud(updated);
+    // Collaborative edit — any profile can edit any pin's notes & category
+    const existing = notes.find(n => n.id === editingId);
+    if (!existing) return;
+    const prevBody = existing.body || '';
+    const history = existing.editHistory ? [...existing.editHistory] : [];
+
+    // Only add a history entry if something actually changed
+    if (body !== prevBody || cat !== existing.cat || title !== existing.title) {
+      history.push({ who: activeProfile, action: 'edited', ts: now });
     }
+
+    const updated = Object.assign({}, existing, { title, body, cat, editHistory: history, lastEditedBy: activeProfile, lastEditedAt: now });
+    await saveNoteToCloud(updated);
   } else {
     if (!currentLat) return;
-    const note = { id: Date.now(), lat: currentLat, lng: currentLng, title, body, cat, profile: activeProfile };
+    const id = now;
+    const history = [{ who: activeProfile, action: 'created', ts: now }];
+    const note = { id, lat: currentLat, lng: currentLng, title, body, cat, profile: activeProfile, editHistory: history, lastEditedBy: activeProfile, lastEditedAt: now };
     if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
     await saveNoteToCloud(note);
   }
@@ -719,19 +517,59 @@ async function saveNote() {
 
 async function deleteNote() {
   if (editingId === null) return;
+  const note = notes.find(n => n.id === editingId);
+  if (!note) return;
+  // Only the original creator can delete
+  if (note.profile !== activeProfile) {
+    alert('Only ' + note.profile + ' (the creator) can delete this pin.');
+    return;
+  }
+  if (!confirm('Delete this pin? This cannot be undone.')) return;
   await deleteNoteFromCloud(editingId);
   closeDrawer();
+}
+
+// ── Render markers ──
+function formatTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' at ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
 function placeMarker(note) {
   const emoji = CAT_EMOJI[note.cat] || '📍';
   const m = L.marker([note.lat, note.lng], { icon: makeIcon(emoji) }).addTo(map);
-  const popupHtml = '<div class="popup-title">' + emoji + ' ' + note.title + '</div>' +
-    (note.body ? '<div class="popup-body">' + note.body.substring(0,120) + (note.body.length>120?'...':'') + '</div>' : '') +
-    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(' + note.id + ')">Edit</button>' +
-    '<button class="popup-btn" onclick="map.closePopup();askAboutNote(' + note.id + ')">Ask AI</button></div>';
-  m.bindPopup(popupHtml, { maxWidth: 260 });
+
+  const lastEdit = note.lastEditedBy && note.lastEditedAt
+    ? '<div class="popup-edited">Last edited by <strong>' + note.lastEditedBy + '</strong> · ' + formatTs(note.lastEditedAt) + '</div>'
+    : '';
+
+  const popupHtml =
+    '<div class="popup-title">' + emoji + ' ' + note.title + '</div>' +
+    '<div class="popup-creator">📍 Added by <strong>' + (note.profile || 'unknown') + '</strong></div>' +
+    (note.body ? '<div class="popup-body">' + note.body.substring(0,140) + (note.body.length>140?'...':'') + '</div>' : '') +
+    lastEdit +
+    '<div class="popup-actions"><button class="popup-btn primary" onclick="map.closePopup();editNote(' + note.id + ')">Edit / Add notes</button></div>';
+
+  m.bindPopup(popupHtml, { maxWidth: 280 });
   markers[note.id] = m;
+}
+
+function renderEditHistory(note) {
+  const wrap = document.getElementById('edit-history-wrap');
+  const el = document.getElementById('edit-history');
+  const history = note.editHistory || [];
+  if (!history.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  el.innerHTML = history.slice().reverse().slice(0, 8).map(function(e) {
+    const isCreate = e.action === 'created';
+    return '<div class="edit-entry">' +
+      '<div class="edit-avatar' + (isCreate ? ' create' : '') + '">' + (e.who ? e.who[0].toUpperCase() : '?') + '</div>' +
+      '<div class="edit-meta"><span class="edit-who">' + (e.who || 'Unknown') + '</span>' +
+      '<span class="edit-time">· ' + formatTs(e.ts) + '</span>' +
+      '<div class="edit-action">' + (isCreate ? 'created this pin' : 'edited notes') + '</div>' +
+      '</div></div>';
+  }).join('');
 }
 
 function editNote(id) {
@@ -744,26 +582,32 @@ function editNote(id) {
   document.getElementById('coords-pill').textContent = 'Lat ' + note.lat.toFixed(4) + '  Lng ' + note.lng.toFixed(4);
   document.querySelectorAll('.cat-btn').forEach(b => b.classList.toggle('selected', b.dataset.cat === note.cat));
   document.getElementById('drawer-title').textContent = 'Edit place';
-  document.getElementById('delete-btn').style.display = 'block';
-  resetAiChat();
-  openDrawer();
-}
 
-function askAboutNote(id) {
-  const note = notes.find(n => n.id === id);
-  if (!note) return;
-  editNote(id);
-  setTimeout(function() { quickAsk('Tell me more about ' + note.title + ' — what should I know?'); }, 300);
+  // Anyone can edit, but only creator can delete
+  const isCreator = note.profile === activeProfile;
+  document.getElementById('delete-btn').style.display = isCreator ? 'block' : 'none';
+  document.getElementById('footer-owner-note').style.display = isCreator ? 'none' : 'block';
+  document.getElementById('notes-collab-hint').style.display = 'inline';
+
+  renderEditHistory(note);
+  buildWikiLinks(note.title);
+  openDrawer();
 }
 
 function renderList() {
   const total = notes.length;
   document.getElementById('sb-count').textContent = total;
   document.getElementById('sb-empty').style.display = total ? 'none' : 'block';
-  document.getElementById('sb-items').innerHTML = notes.map(function(n) {
+  // Sort by most recently edited
+  const sorted = notes.slice().sort(function(a,b){ return (b.lastEditedAt||0)-(a.lastEditedAt||0); });
+  document.getElementById('sb-items').innerHTML = sorted.map(function(n) {
     const em = CAT_EMOJI[n.cat] || '📍';
-    const profileTag = n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span> · ' : '';
-    return '<div class="sb-item" onclick="flyTo(' + n.id + ')"><div class="sb-emoji">' + em + '</div><div class="sb-info"><div class="sb-title">' + n.title + '</div><div class="sb-sub">' + profileTag + (n.body || 'No notes') + '</div></div></div>';
+    const creator = n.profile ? '<span style="font-size:10px;color:var(--accent);font-weight:600;">' + n.profile + '</span>' : '';
+    const lastEd = n.lastEditedBy && n.lastEditedBy !== n.profile ? ' · <span style="color:var(--text3)">edited by ' + n.lastEditedBy + '</span>' : '';
+    return '<div class="sb-item" onclick="flyTo(' + n.id + ')">' +
+      '<div class="sb-emoji">' + em + '</div>' +
+      '<div class="sb-info"><div class="sb-title">' + n.title + '</div>' +
+      '<div class="sb-sub">' + creator + lastEd + (n.body ? ' · ' + n.body : '') + '</div></div></div>';
   }).join('');
 }
 
@@ -772,61 +616,39 @@ function flyTo(id) {
   if (note) { map.flyTo([note.lat, note.lng], 13, { duration: 1 }); setTimeout(function(){ if(markers[id]) markers[id].openPopup(); }, 1100); }
 }
 
-// ── Wikipedia Link Buttons ──
+// ── Wikipedia guide links ──
 function buildWikiLinks(locationName) {
-  const city = locationName.split(',')[0].trim();
-  const enc = encodeURIComponent(city);
-
+  const box = document.getElementById('wiki-buttons');
+  const noLoc = document.getElementById('wiki-no-location');
+  const city = (locationName || '').split(',')[0].trim();
+  if (!city) { noLoc.style.display = 'block'; box.style.display = 'none'; return; }
+  noLoc.style.display = 'none';
+  box.style.display = 'flex';
   const links = [
     { icon: '📖', label: 'Overview', query: city },
     { icon: '🏛', label: 'Tourism & Attractions', query: 'Tourism in ' + city },
     { icon: '🍜', label: 'Cuisine & Food', query: city + ' cuisine' },
     { icon: '🌤', label: 'Climate & Weather', query: city + ' climate' },
     { icon: '🚌', label: 'Transport', query: 'Transport in ' + city },
-    { icon: '🏨', label: 'Accommodation', query: city + ' hotels accommodation' },
   ];
-
-  const box = document.getElementById('wiki-buttons');
-  const noLoc = document.getElementById('wiki-no-location');
-
-  if (!locationName) {
-    noLoc.style.display = 'block';
-    box.style.display = 'none';
-    return;
-  }
-
-  noLoc.style.display = 'none';
-  box.style.display = 'flex';
-  box.innerHTML = links.map(l => {
+  box.innerHTML = links.map(function(l) {
     const url = 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(l.query);
     return '<a href="' + url + '" target="_blank" class="wiki-btn">' +
       '<span class="wiki-icon">' + l.icon + '</span>' +
       '<span class="wiki-label">' + l.label + '</span>' +
-      '<span class="wiki-arrow">→</span>' +
-      '</a>';
+      '<span class="wiki-arrow">→</span></a>';
   }).join('');
 }
 
-function resetAiChat() {
-  buildWikiLinks(currentLocationName);
-}
-
-// ── Init: wait for Firebase, then start live listener and show profile modal ──
+// ── Init ──
 function startApp() {
-  subscribeToAllPins(); // live listener for all pins
+  subscribeToAllPins();
   const saved = localStorage.getItem(ACTIVE_KEY);
-  if (saved) {
-    switchProfile(saved);
-  } else {
-    openProfileModal();
-  }
+  if (saved) { switchProfile(saved); } else { openProfileModal(); }
 }
 
-if (window._firebaseReady) {
-  startApp();
-} else {
-  window.addEventListener('firebase-ready', startApp);
-}
+if (window._firebaseReady) { startApp(); }
+else { window.addEventListener('firebase-ready', startApp); }
 </script>
 </body>
 </html>
