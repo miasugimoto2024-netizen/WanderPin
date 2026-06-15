@@ -349,6 +349,19 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 .profile-btn:hover { border-color: var(--border2); color: var(--text); }
 .profile-btn .p-avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
+.wiki-btn {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 14px;
+  font-size: 13px; font-weight: 500; color: var(--text);
+  cursor: pointer; font-family: inherit; text-decoration: none;
+  transition: all 0.15s;
+}
+.wiki-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.wiki-btn .wiki-icon { font-size: 18px; flex-shrink: 0; }
+.wiki-btn .wiki-label { flex: 1; }
+.wiki-btn .wiki-arrow { color: var(--text3); font-size: 12px; }
+
 /* Popups */
 .leaflet-popup-content-wrapper { background: var(--surface) !important; border: 1px solid var(--border2) !important; border-radius: 12px !important; box-shadow: var(--shadow-lg) !important; }
 .leaflet-popup-tip-container { display: none; }
@@ -448,23 +461,9 @@ textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
 
     <div class="tips-section">
       <div class="field-label">✦ Wikipedia Travel Guide</div>
-      <div class="quick-asks" id="quick-asks">
-        <button class="quick-btn" onclick="quickAsk('Best budget hostels here?')">🛏 Hostels</button>
-        <button class="quick-btn" onclick="quickAsk('Top local food and restaurants to try?')">🍜 Local food</button>
-        <button class="quick-btn" onclick="quickAsk('Best free things to do and hidden gems?')">🏛 What to see</button>
-        <button class="quick-btn" onclick="quickAsk('Budget travel tips and how to save money here?')">💸 Budget tips</button>
-        <button class="quick-btn" onclick="quickAsk('Is it safe for solo travelers? Any tips?')">🧳 Solo travel</button>
-      </div>
-      <div class="ai-chat-box">
-        <div class="ai-messages" id="ai-messages">
-          <div class="msg">
-            <div class="msg-bubble" style="border:none;background:none;padding:4px 0;color:var(--text3);font-size:13px;">Pick a topic above or ask anything about this destination.</div>
-          </div>
-        </div>
-        <div class="ai-input-row">
-          <input type="text" id="ai-input" placeholder="e.g. What's the weather like in October?" />
-          <button class="ai-send" id="ai-send-btn" onclick="sendAiMessage()">➤</button>
-        </div>
+      <div id="wiki-links-box">
+        <p id="wiki-no-location" style="font-size:13px;color:var(--text3);">Save a place to see Wikipedia links for it.</p>
+        <div id="wiki-buttons" style="display:none; display:flex; flex-direction:column; gap:8px;"></div>
       </div>
     </div>
   </div>
@@ -483,7 +482,7 @@ let currentLocationName = '';
 let currentTheme = 'light';
 let aiBusy = false;
 let activeProfile = null;
-let unsubscribeSnapshot = null; // live listener cleanup
+let unsubscribeSnapshot = null;
 
 // ── Firestore helpers (wait for firebase-ready) ──
 function getDb() { return window._db; }
@@ -731,229 +730,44 @@ function flyTo(id) {
   if (note) { map.flyTo([note.lat, note.lng], 13, { duration: 1 }); setTimeout(function(){ if(markers[id]) markers[id].openPopup(); }, 1100); }
 }
 
-// ── Wikipedia Travel Guide ──
-let wikiCache = {};
+// ── Wikipedia Link Buttons ──
+function buildWikiLinks(locationName) {
+  const city = locationName.split(',')[0].trim();
+  const enc = encodeURIComponent(city);
+
+  const links = [
+    { icon: '📖', label: 'Overview', query: city },
+    { icon: '🏛', label: 'Tourism & Attractions', query: 'Tourism in ' + city },
+    { icon: '🍜', label: 'Cuisine & Food', query: city + ' cuisine' },
+    { icon: '🌤', label: 'Climate & Weather', query: city + ' climate' },
+    { icon: '🚌', label: 'Transport', query: 'Transport in ' + city },
+    { icon: '🏨', label: 'Accommodation', query: city + ' hotels accommodation' },
+  ];
+
+  const box = document.getElementById('wiki-buttons');
+  const noLoc = document.getElementById('wiki-no-location');
+
+  if (!locationName) {
+    noLoc.style.display = 'block';
+    box.style.display = 'none';
+    return;
+  }
+
+  noLoc.style.display = 'none';
+  box.style.display = 'flex';
+  box.innerHTML = links.map(l => {
+    const url = 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(l.query);
+    return '<a href="' + url + '" target="_blank" class="wiki-btn">' +
+      '<span class="wiki-icon">' + l.icon + '</span>' +
+      '<span class="wiki-label">' + l.label + '</span>' +
+      '<span class="wiki-arrow">→</span>' +
+      '</a>';
+  }).join('');
+}
 
 function resetAiChat() {
-  const loc = currentLocationName || 'this location';
-  document.getElementById('ai-messages').innerHTML =
-    '<div class="msg"><div class="msg-avatar ai">W</div><div class="msg-bubble">Explore <strong>' + loc + '</strong> using Wikipedia! Pick a topic above or ask anything below.</div></div>';
-  if (currentLocationName) autoLoadLocationInfo(currentLocationName);
+  buildWikiLinks(currentLocationName);
 }
-
-function quickAsk(q) {
-  document.getElementById('ai-input').value = q;
-  sendAiMessage();
-}
-
-function addMessage(role, html, isLoading) {
-  const messagesEl = document.getElementById('ai-messages');
-  const div = document.createElement('div');
-  div.className = 'msg' + (role === 'user' ? ' user' : '');
-  div.innerHTML = role === 'user'
-    ? '<div class="msg-avatar user">👤</div><div class="msg-bubble">' + html + '</div>'
-    : '<div class="msg-avatar ai">W</div><div class="msg-bubble' + (isLoading ? ' loading' : '') + '">' + html + '</div>';
-  messagesEl.appendChild(div);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-  return div;
-}
-
-// Try a list of candidate article titles in order, return first hit
-async function fetchFirstValidWikiArticle(candidates) {
-  for (const title of candidates) {
-    const cacheKey = title.toLowerCase();
-    if (wikiCache[cacheKey]) return wikiCache[cacheKey];
-    try {
-      const url = 'https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&redirects=1&titles=' +
-        encodeURIComponent(title) + '&format=json&origin=*';
-      const resp = await fetch(url);
-      const data = await resp.json();
-      const pages = data.query && data.query.pages;
-      const page = pages && Object.values(pages)[0];
-      // page.missing means article doesn't exist
-      if (page && !page.hasOwnProperty('missing') && page.extract && page.extract.length > 100) {
-        const result = { title: page.title, extract: page.extract, url: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(page.title.replace(/ /g, '_')) };
-        wikiCache[cacheKey] = result;
-        return result;
-      }
-    } catch(e) {}
-  }
-  return null;
-}
-
-// Build targeted candidate article titles based on topic + location
-function buildCandidates(topic, loc) {
-  // Clean up location — strip coordinates, take just the city name
-  const city = loc.split(',')[0].trim();
-
-  switch(topic) {
-    case 'overview':
-      return [
-        'Tourism in ' + city,
-        city + ' tourism',
-        city,
-      ];
-    case 'food':
-      return [
-        city + ' cuisine',
-        'Cuisine of ' + city,
-        'Food in ' + city,
-        city + ' food',
-        city, // fallback to city article
-      ];
-    case 'hostels':
-    case 'budget':
-      return [
-        'Backpacking in ' + city,
-        'Budget travel ' + city,
-        'Tourism in ' + city,
-        city + ' tourism',
-        city,
-      ];
-    case 'attractions':
-      return [
-        'Tourism in ' + city,
-        city + ' tourism',
-        'Attractions in ' + city,
-        city,
-      ];
-    case 'safety':
-      return [
-        city,
-        'Tourism in ' + city,
-      ];
-    case 'climate':
-      return [
-        city + ' climate',
-        'Climate of ' + city,
-        city,
-      ];
-    case 'transport':
-      return [
-        'Transport in ' + city,
-        city + ' transport',
-        city + ' transportation',
-        city,
-      ];
-    default:
-      return [city];
-  }
-}
-
-// Detect topic from user question
-function detectTopic(q) {
-  const lq = q.toLowerCase();
-  if (lq.includes('food') || lq.includes('eat') || lq.includes('restaurant') || lq.includes('cuisine') || lq.includes('dish')) return 'food';
-  if (lq.includes('hostel') || lq.includes('cheap') || lq.includes('budget') || lq.includes('backpack')) return 'budget';
-  if (lq.includes('see') || lq.includes('visit') || lq.includes('attract') || lq.includes('landmark') || lq.includes('hidden') || lq.includes('free')) return 'attractions';
-  if (lq.includes('safe') || lq.includes('solo') || lq.includes('danger')) return 'safety';
-  if (lq.includes('weather') || lq.includes('climate') || lq.includes('temperature') || lq.includes('rain') || lq.includes('season')) return 'climate';
-  if (lq.includes('bus') || lq.includes('train') || lq.includes('transport') || lq.includes('getting around') || lq.includes('metro') || lq.includes('subway')) return 'transport';
-  return 'overview';
-}
-
-// Pull the most relevant section from a long Wikipedia extract
-function extractRelevantSection(extract, topic) {
-  // Split into paragraphs
-  const paras = extract.split('\n').map(p => p.trim()).filter(p => p.length > 60);
-  if (paras.length === 0) return extract;
-
-  const keywords = {
-    food: ['food', 'cuisine', 'dish', 'eat', 'restaurant', 'culinary', 'cook', 'meal', 'drink'],
-    budget: ['budget', 'hostel', 'backpack', 'cheap', 'afford', 'cost', 'price', 'inexpensive'],
-    attractions: ['tourism', 'tourist', 'visit', 'landmark', 'attraction', 'sight', 'museum', 'monument', 'temple', 'church'],
-    safety: ['safe', 'crime', 'danger', 'security', 'risk', 'caution'],
-    climate: ['climate', 'weather', 'temperature', 'rain', 'season', 'humid', 'dry', 'hot', 'cold'],
-    transport: ['transport', 'bus', 'train', 'metro', 'subway', 'tram', 'taxi', 'airport', 'transit'],
-    overview: [],
-  };
-
-  const words = keywords[topic] || [];
-
-  // Score each paragraph by keyword matches
-  const scored = paras.map(p => {
-    const lp = p.toLowerCase();
-    const score = words.reduce((s, w) => s + (lp.includes(w) ? 1 : 0), 0);
-    return { p, score };
-  });
-
-  // Sort by score, take top 2 most relevant paragraphs
-  scored.sort((a, b) => b.score - a.score);
-  const best = scored.slice(0, 2).map(s => s.p).join('\n\n');
-
-  // Trim to ~600 chars
-  let text = best.trim();
-  if (text.length > 650) {
-    text = text.substring(0, 650);
-    const lastDot = text.lastIndexOf('.');
-    if (lastDot > 400) text = text.substring(0, lastDot + 1);
-    else text += '…';
-  }
-  return text;
-}
-
-async function sendAiMessage() {
-  if (aiBusy) return;
-  const input = document.getElementById('ai-input');
-  const q = input.value.trim();
-  if (!q) return;
-  input.value = '';
-  aiBusy = true;
-  document.getElementById('ai-send-btn').disabled = true;
-
-  const loc = currentLocationName || (currentLat ? currentLat.toFixed(3) + ', ' + currentLng.toFixed(3) : '');
-  addMessage('user', q);
-  const loadingDiv = addMessage('ai', '<span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>', true);
-
-  try {
-    const topic = detectTopic(q);
-    const candidates = loc ? buildCandidates(topic, loc) : [q];
-    const wiki = await fetchFirstValidWikiArticle(candidates);
-
-    let html;
-    if (wiki) {
-      const snippet = extractRelevantSection(wiki.extract, topic);
-      html = '<p>' + snippet.replace(/\n\n/g, '</p><p style="margin-top:8px">') + '</p>' +
-        '<p style="margin-top:8px"><a href="' + wiki.url + '" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none;">📖 ' + wiki.title + ' on Wikipedia →</a></p>';
-    } else {
-      const fallbackUrl = 'https://en.wikipedia.org/w/index.php?search=' + encodeURIComponent(loc ? loc + ' travel' : q);
-      html = 'No Wikipedia article found for this. <a href="' + fallbackUrl + '" target="_blank" style="color:var(--accent)">Search Wikipedia directly →</a>';
-    }
-
-    loadingDiv.querySelector('.msg-bubble').innerHTML = html;
-    loadingDiv.querySelector('.msg-bubble').classList.remove('loading');
-  } catch(err) {
-    loadingDiv.querySelector('.msg-bubble').innerHTML = 'Couldn\'t reach Wikipedia. Check your connection and try again.';
-    loadingDiv.querySelector('.msg-bubble').classList.remove('loading');
-  }
-
-  aiBusy = false;
-  document.getElementById('ai-send-btn').disabled = false;
-  document.getElementById('ai-messages').scrollTop = 999999;
-}
-
-async function autoLoadLocationInfo(loc) {
-  const loadingDiv = addMessage('ai', '<span class="dot-anim"><span>•</span><span>•</span><span>•</span></span>', true);
-  try {
-    const candidates = buildCandidates('overview', loc);
-    const wiki = await fetchFirstValidWikiArticle(candidates);
-    if (wiki) {
-      const snippet = extractRelevantSection(wiki.extract, 'overview');
-      loadingDiv.querySelector('.msg-bubble').innerHTML =
-        '<p>' + snippet + '</p><p style="margin-top:8px"><a href="' + wiki.url + '" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none;">📖 ' + wiki.title + ' on Wikipedia →</a></p>';
-    } else {
-      loadingDiv.querySelector('.msg-bubble').innerHTML = 'No Wikipedia overview found. Try asking a specific question below!';
-    }
-  } catch(e) {
-    loadingDiv.querySelector('.msg-bubble').innerHTML = 'Could not load travel info. Check your connection.';
-  }
-  loadingDiv.querySelector('.msg-bubble').classList.remove('loading');
-  document.getElementById('ai-messages').scrollTop = 999999;
-}
-
-async function fetchWikiSummaryAndShow(loc) { autoLoadLocationInfo(loc); }
-
-document.getElementById('ai-input').addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey) sendAiMessage(); });
 
 // ── Init: wait for Firebase, then start live listener and show profile modal ──
 function startApp() {
